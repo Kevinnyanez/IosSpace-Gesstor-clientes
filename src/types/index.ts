@@ -22,7 +22,7 @@ export interface Deuda {
   fecha_vencimiento: string;
   fecha_creacion: string;
   recargos: number;
-  estado: 'pendiente' | 'pagado' | 'vencido';
+  estado: string; // Cambio a string genérico para compatibilidad con Supabase
   notas: string | null;
   created_at: string;
   updated_at: string;
