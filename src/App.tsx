@@ -9,6 +9,7 @@ import { Dashboard } from "./components/Dashboard";
 import { ClientesPage } from "./components/ClientesPage";
 import { DeudasPage } from "./components/DeudasPage";
 import { CalendarioPage } from "./components/CalendarioPage";
+import { InventarioPage } from "./components/InventarioPage";
 import { ConfiguracionPage } from "./components/ConfiguracionPage";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/clientes" element={<ClientesPage />} />
             <Route path="/deudas" element={<DeudasPage />} />
             <Route path="/calendario" element={<CalendarioPage />} />
+            <Route path="/inventario" element={<InventarioPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

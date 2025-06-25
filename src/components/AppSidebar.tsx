@@ -9,7 +9,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Home, Users, Package, CreditCard, Calendar, Settings } from "lucide-react";
@@ -18,9 +17,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Clientes", url: "/clientes", icon: Users },
-  { title: "Productos", url: "/productos", icon: Package },
   { title: "Deudas", url: "/deudas", icon: CreditCard },
   { title: "Calendario", url: "/calendario", icon: Calendar },
+  { title: "Inventario", url: "/inventario", icon: Package },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
 
@@ -31,9 +30,8 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-gray-200">
       <SidebarHeader className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <h2 className="text-xl font-bold text-blue-900">GestorPro</h2>
-          <SidebarTrigger />
         </div>
       </SidebarHeader>
       <SidebarContent>
