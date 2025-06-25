@@ -1,54 +1,79 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, DollarSign, AlertTriangle, Calendar } from "lucide-react";
-import type { Deuda } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import type { DeudaConCliente } from "@/types";
 
 export function DeudasPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Datos mock para demostración
-  const [deudas] = useState<Deuda[]>([
-    {
-      id: '1',
-      clienteId: '1',
-      productoId: '1',
-      montoTotal: 1500,
-      montoAbonado: 500,
-      montoRestante: 1000,
-      fechaVencimiento: new Date('2024-07-15'),
-      fechaCreacion: new Date('2024-06-01'),
-      recargos: 50,
-      estado: 'vencido'
-    },
-    {
-      id: '2',
-      clienteId: '2',
-      productoId: '2',
-      montoTotal: 800,
-      montoAbonado: 300,
-      montoRestante: 500,
-      fechaVencimiento: new Date('2024-07-30'),
-      fechaCreacion: new Date('2024-06-15'),
-      recargos: 0,
-      estado: 'pendiente'
-    },
-    {
-      id: '3',
-      clienteId: '1',
-      productoId: '3',
-      montoTotal: 2200,
-      montoAbonado: 2200,
-      montoRestante: 0,
-      fechaVencimiento: new Date('2024-06-20'),
-      fechaCreacion: new Date('2024-05-01'),
-      recargos: 0,
-      estado: 'pagado'
+  const [deudas, setDeudas] = useState<DeudaConCliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalAdeudado: 0,
+    recargosAplicados: 0,
+    cobradoMes: 0,
+    deudasActivas: 0,
+    deudasConRecargo: 0,
+    pagosCompletados: 0
+  });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchDeudas();
+  }, []);
+
+  const fetchDeudas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('deudas')
+        .select(`
+          *,
+          cliente:clientes(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const deudasData = data || [];
+      setDeudas(deudasData);
+      
+      // Calcular estadísticas
+      const totalAdeudado = deudasData
+        .filter(d => d.estado !== 'pagado')
+        .reduce((sum, d) => sum + d.monto_restante, 0);
+      
+      const recargosAplicados = deudasData
+        .reduce((sum, d) => sum + d.recargos, 0);
+      
+      const cobradoMes = deudasData
+        .filter(d => d.estado === 'pagado')
+        .reduce((sum, d) => sum + d.monto_total, 0);
+
+      setStats({
+        totalAdeudado,
+        recargosAplicados,
+        cobradoMes,
+        deudasActivas: deudasData.filter(d => d.estado !== 'pagado').length,
+        deudasConRecargo: deudasData.filter(d => d.recargos > 0).length,
+        pagosCompletados: deudasData.filter(d => d.estado === 'pagado').length
+      });
+
+    } catch (error) {
+      console.error('Error fetching deudas:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las deudas",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   const getEstadoBadge = (estado: string) => {
     const variants = {
@@ -58,6 +83,20 @@ export function DeudasPage() {
     };
     return variants[estado as keyof typeof variants] || variants.pendiente;
   };
+
+  const filteredDeudas = deudas.filter(deuda =>
+    deuda.concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    deuda.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    deuda.cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-lg">Cargando deudas...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -79,8 +118,10 @@ export function DeudasPage() {
             <DollarSign className="h-5 w-5 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">$1,500</div>
-            <p className="text-xs text-gray-600 mt-1">2 deudas activas</p>
+            <div className="text-2xl font-bold text-red-600">
+              ${stats.totalAdeudado.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-600 mt-1">{stats.deudasActivas} deudas activas</p>
           </CardContent>
         </Card>
 
@@ -90,8 +131,10 @@ export function DeudasPage() {
             <AlertTriangle className="h-5 w-5 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">$50</div>
-            <p className="text-xs text-gray-600 mt-1">1 deuda con recargo</p>
+            <div className="text-2xl font-bold text-orange-600">
+              ${stats.recargosAplicados.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-600 mt-1">{stats.deudasConRecargo} deudas con recargo</p>
           </CardContent>
         </Card>
 
@@ -101,8 +144,10 @@ export function DeudasPage() {
             <DollarSign className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">$2,200</div>
-            <p className="text-xs text-gray-600 mt-1">1 pago completado</p>
+            <div className="text-2xl font-bold text-green-600">
+              ${stats.cobradoMes.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-600 mt-1">{stats.pagosCompletados} pagos completados</p>
           </CardContent>
         </Card>
       </div>
@@ -110,7 +155,7 @@ export function DeudasPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Registro de Deudas</CardTitle>
+            <CardTitle>Registro de Deudas ({filteredDeudas.length})</CardTitle>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -123,80 +168,91 @@ export function DeudasPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left p-4 font-semibold text-gray-700">Cliente</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Producto</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Monto Total</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Abonado</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Restante</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Recargos</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Vencimiento</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Estado</th>
-                  <th className="text-left p-4 font-semibold text-gray-700">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deudas.map((deuda) => (
-                  <tr key={deuda.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-medium text-gray-900">
-                      {deuda.clienteId === '1' ? 'Juan Pérez' : 'María García'}
-                    </td>
-                    <td className="p-4 text-gray-600">
-                      {deuda.productoId === '1' ? 'Producto Premium A' : 
-                       deuda.productoId === '2' ? 'Servicio Básico B' : 'Producto Especial C'}
-                    </td>
-                    <td className="p-4 text-gray-900 font-medium">
-                      ${deuda.montoTotal.toLocaleString()}
-                    </td>
-                    <td className="p-4 text-green-600 font-medium">
-                      ${deuda.montoAbonado.toLocaleString()}
-                    </td>
-                    <td className="p-4 font-medium">
-                      <span className={deuda.montoRestante > 0 ? 'text-red-600' : 'text-gray-400'}>
-                        ${deuda.montoRestante.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {deuda.recargos > 0 ? (
-                        <span className="text-orange-600 font-medium">
-                          ${deuda.recargos}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        {deuda.fechaVencimiento.toLocaleDateString('es-AR')}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge 
-                        className={getEstadoBadge(deuda.estado).color}
-                        variant="outline"
-                      >
-                        {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700">
-                          Abonar
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Ver
-                        </Button>
-                      </div>
-                    </td>
+          {filteredDeudas.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No hay deudas registradas</p>
+              <Button className="mt-4 bg-orange-600 hover:bg-orange-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Crear primera deuda
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left p-4 font-semibold text-gray-700">Cliente</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Concepto</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Monto Total</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Abonado</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Restante</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Recargos</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Vencimiento</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Estado</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredDeudas.map((deuda) => (
+                    <tr key={deuda.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="p-4 font-medium text-gray-900">
+                        {deuda.cliente.nombre} {deuda.cliente.apellido}
+                      </td>
+                      <td className="p-4 text-gray-600">
+                        {deuda.concepto}
+                      </td>
+                      <td className="p-4 text-gray-900 font-medium">
+                        ${deuda.monto_total.toLocaleString()}
+                      </td>
+                      <td className="p-4 text-green-600 font-medium">
+                        ${deuda.monto_abonado.toLocaleString()}
+                      </td>
+                      <td className="p-4 font-medium">
+                        <span className={deuda.monto_restante > 0 ? 'text-red-600' : 'text-gray-400'}>
+                          ${deuda.monto_restante.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {deuda.recargos > 0 ? (
+                          <span className="text-orange-600 font-medium">
+                            ${deuda.recargos.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR')}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge 
+                          className={getEstadoBadge(deuda.estado).color}
+                          variant="outline"
+                        >
+                          {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          {deuda.estado !== 'pagado' && (
+                            <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700">
+                              Abonar
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm">
+                            Ver
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

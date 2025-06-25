@@ -9,13 +9,175 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          activo: boolean
+          apellido: string
+          created_at: string
+          direccion: string | null
+          email: string | null
+          fecha_registro: string
+          id: string
+          nombre: string
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          apellido: string
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          fecha_registro?: string
+          id?: string
+          nombre: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          apellido?: string
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          fecha_registro?: string
+          id?: string
+          nombre?: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      configuracion: {
+        Row: {
+          created_at: string
+          dias_para_recargo: number
+          id: string
+          moneda_default: string
+          porcentaje_recargo: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dias_para_recargo?: number
+          id?: string
+          moneda_default?: string
+          porcentaje_recargo?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dias_para_recargo?: number
+          id?: string
+          moneda_default?: string
+          porcentaje_recargo?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      deudas: {
+        Row: {
+          cliente_id: string
+          concepto: string
+          created_at: string
+          estado: string
+          fecha_creacion: string
+          fecha_vencimiento: string
+          id: string
+          monto_abonado: number
+          monto_restante: number | null
+          monto_total: number
+          notas: string | null
+          recargos: number
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          concepto: string
+          created_at?: string
+          estado?: string
+          fecha_creacion?: string
+          fecha_vencimiento: string
+          id?: string
+          monto_abonado?: number
+          monto_restante?: number | null
+          monto_total: number
+          notas?: string | null
+          recargos?: number
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          concepto?: string
+          created_at?: string
+          estado?: string
+          fecha_creacion?: string
+          fecha_vencimiento?: string
+          id?: string
+          monto_abonado?: number
+          monto_restante?: number | null
+          monto_total?: number
+          notas?: string | null
+          recargos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deudas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagos: {
+        Row: {
+          created_at: string
+          deuda_id: string
+          fecha_pago: string
+          id: string
+          metodo_pago: string | null
+          monto: number
+          notas: string | null
+        }
+        Insert: {
+          created_at?: string
+          deuda_id: string
+          fecha_pago?: string
+          id?: string
+          metodo_pago?: string | null
+          monto: number
+          notas?: string | null
+        }
+        Update: {
+          created_at?: string
+          deuda_id?: string
+          fecha_pago?: string
+          id?: string
+          metodo_pago?: string | null
+          monto?: number
+          notas?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_deuda_id_fkey"
+            columns: ["deuda_id"]
+            isOneToOne: false
+            referencedRelation: "deudas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      aplicar_recargos_vencidos: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

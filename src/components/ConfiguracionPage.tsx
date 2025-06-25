@@ -1,27 +1,93 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings, Percent, Calendar, DollarSign, Save } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import type { Configuracion } from "@/types";
 
 export function ConfiguracionPage() {
   const { toast } = useToast();
-  const [config, setConfig] = useState({
-    porcentajeRecargo: 5,
-    diasParaRecargo: 30,
-    monedaDefault: 'ARS'
-  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [config, setConfig] = useState<Configuracion | null>(null);
 
-  const handleSave = () => {
-    toast({
-      title: "Configuración guardada",
-      description: "Los cambios se han aplicado correctamente.",
-    });
+  useEffect(() => {
+    fetchConfiguracion();
+  }, []);
+
+  const fetchConfiguracion = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('configuracion')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      setConfig(data);
+    } catch (error) {
+      console.error('Error fetching configuracion:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la configuración",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    if (!config) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('configuracion')
+        .update({
+          porcentaje_recargo: config.porcentaje_recargo,
+          dias_para_recargo: config.dias_para_recargo,
+          moneda_default: config.moneda_default
+        })
+        .eq('id', config.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Configuración guardada",
+        description: "Los cambios se han aplicado correctamente.",
+      });
+    } catch (error) {
+      console.error('Error saving configuracion:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la configuración",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-lg">Cargando configuración...</div>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-lg text-red-600">Error al cargar la configuración</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -46,8 +112,9 @@ export function ConfiguracionPage() {
               <Input
                 id="porcentaje"
                 type="number"
-                value={config.porcentajeRecargo}
-                onChange={(e) => setConfig({...config, porcentajeRecargo: Number(e.target.value)})}
+                step="0.01"
+                value={config.porcentaje_recargo}
+                onChange={(e) => setConfig({...config, porcentaje_recargo: Number(e.target.value)})}
                 className="mt-2"
               />
               <p className="text-sm text-gray-600 mt-1">
@@ -60,8 +127,8 @@ export function ConfiguracionPage() {
               <Input
                 id="dias"
                 type="number"
-                value={config.diasParaRecargo}
-                onChange={(e) => setConfig({...config, diasParaRecargo: Number(e.target.value)})}
+                value={config.dias_para_recargo}
+                onChange={(e) => setConfig({...config, dias_para_recargo: Number(e.target.value)})}
                 className="mt-2"
               />
               <p className="text-sm text-gray-600 mt-1">
@@ -81,7 +148,10 @@ export function ConfiguracionPage() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="moneda">Moneda por Defecto</Label>
-              <Select value={config.monedaDefault} onValueChange={(value) => setConfig({...config, monedaDefault: value})}>
+              <Select 
+                value={config.moneda_default} 
+                onValueChange={(value) => setConfig({...config, moneda_default: value})}
+              >
                 <SelectTrigger className="mt-2">
                   <SelectValue />
                 </SelectTrigger>
@@ -109,7 +179,7 @@ export function ConfiguracionPage() {
               <div className="flex items-center gap-3">
                 <Percent className="h-8 w-8 text-blue-600" />
                 <div>
-                  <p className="text-2xl font-bold text-blue-600">{config.porcentajeRecargo}%</p>
+                  <p className="text-2xl font-bold text-blue-600">{config.porcentaje_recargo}%</p>
                   <p className="text-sm text-blue-700">Recargo por Mora</p>
                 </div>
               </div>
@@ -119,7 +189,7 @@ export function ConfiguracionPage() {
               <div className="flex items-center gap-3">
                 <Calendar className="h-8 w-8 text-orange-600" />
                 <div>
-                  <p className="text-2xl font-bold text-orange-600">{config.diasParaRecargo}</p>
+                  <p className="text-2xl font-bold text-orange-600">{config.dias_para_recargo}</p>
                   <p className="text-sm text-orange-700">Días de Gracia</p>
                 </div>
               </div>
@@ -129,7 +199,7 @@ export function ConfiguracionPage() {
               <div className="flex items-center gap-3">
                 <DollarSign className="h-8 w-8 text-green-600" />
                 <div>
-                  <p className="text-2xl font-bold text-green-600">{config.monedaDefault}</p>
+                  <p className="text-2xl font-bold text-green-600">{config.moneda_default}</p>
                   <p className="text-sm text-green-700">Moneda Default</p>
                 </div>
               </div>
@@ -139,8 +209,8 @@ export function ConfiguracionPage() {
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2">Cómo Funcionan los Recargos</h3>
             <p className="text-sm text-gray-600">
-              Cuando una deuda pase {config.diasParaRecargo} días de su fecha de vencimiento, 
-              automáticamente se aplicará un recargo del {config.porcentajeRecargo}% sobre el monto pendiente. 
+              Cuando una deuda pase {config.dias_para_recargo} días de su fecha de vencimiento, 
+              automáticamente se aplicará un recargo del {config.porcentaje_recargo}% sobre el monto pendiente. 
               Este proceso se ejecuta diariamente para mantener los saldos actualizados.
             </p>
           </div>
@@ -148,9 +218,13 @@ export function ConfiguracionPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+        <Button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
           <Save className="h-4 w-4 mr-2" />
-          Guardar Configuración
+          {saving ? 'Guardando...' : 'Guardar Configuración'}
         </Button>
       </div>
     </div>
