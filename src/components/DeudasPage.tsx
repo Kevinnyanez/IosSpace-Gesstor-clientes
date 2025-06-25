@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, DollarSign, AlertTriangle, Calendar } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DeudaForm } from "./DeudaForm";
 import type { DeudaConCliente } from "@/types";
 
 export function DeudasPage() {
@@ -105,10 +106,7 @@ export function DeudasPage() {
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Deudas</h1>
           <p className="text-gray-600 mt-2">Controla los pagos y saldos pendientes</p>
         </div>
-        <Button className="bg-orange-600 hover:bg-orange-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Deuda
-        </Button>
+        <DeudaForm onDeudaCreated={fetchDeudas} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -171,10 +169,9 @@ export function DeudasPage() {
           {filteredDeudas.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">No hay deudas registradas</p>
-              <Button className="mt-4 bg-orange-600 hover:bg-orange-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Crear primera deuda
-              </Button>
+              <div className="mt-4">
+                <DeudaForm onDeudaCreated={fetchDeudas} />
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

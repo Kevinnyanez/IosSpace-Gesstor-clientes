@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit, Trash2, Mail, Phone } from "lucide-react";
+import { Search, Edit, Trash2, Mail, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ClienteForm } from "./ClienteForm";
 import type { Cliente } from "@/types";
 
 export function ClientesPage() {
@@ -87,10 +88,7 @@ export function ClientesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
           <p className="text-gray-600 mt-2">Administra tu base de clientes</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Cliente
-        </Button>
+        <ClienteForm onClienteCreated={fetchClientes} />
       </div>
 
       <Card>
@@ -114,10 +112,9 @@ export function ClientesPage() {
           {filteredClientes.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">No hay clientes registrados</p>
-              <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar primer cliente
-              </Button>
+              <div className="mt-4">
+                <ClienteForm onClienteCreated={fetchClientes} />
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
