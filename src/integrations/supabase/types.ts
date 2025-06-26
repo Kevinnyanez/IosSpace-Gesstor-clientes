@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      categorias: {
+        Row: {
+          activa: boolean
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           activo: boolean
@@ -131,6 +158,44 @@ export type Database = {
           },
         ]
       }
+      movimientos_stock: {
+        Row: {
+          cantidad: number
+          created_at: string
+          fecha_movimiento: string
+          id: string
+          motivo: string | null
+          producto_id: string
+          tipo_movimiento: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          fecha_movimiento?: string
+          id?: string
+          motivo?: string | null
+          producto_id: string
+          tipo_movimiento: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          fecha_movimiento?: string
+          id?: string
+          motivo?: string | null
+          producto_id?: string
+          tipo_movimiento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_stock_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagos: {
         Row: {
           created_at: string
@@ -165,6 +230,56 @@ export type Database = {
             columns: ["deuda_id"]
             isOneToOne: false
             referencedRelation: "deudas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos: {
+        Row: {
+          activo: boolean
+          categoria_id: string | null
+          codigo: string | null
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          precio: number
+          stock_actual: number
+          stock_minimo: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria_id?: string | null
+          codigo?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          precio: number
+          stock_actual?: number
+          stock_minimo?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria_id?: string | null
+          codigo?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          precio?: number
+          stock_actual?: number
+          stock_minimo?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
             referencedColumns: ["id"]
           },
         ]

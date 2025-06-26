@@ -47,7 +47,45 @@ export interface Configuracion {
   updated_at: string;
 }
 
-// Tipo extendido para mostrar datos completos
+// Nuevos tipos para inventario
+export interface Categoria {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  activa: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Producto {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  precio: number;
+  stock_actual: number;
+  stock_minimo: number;
+  categoria_id: string | null;
+  codigo: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MovimientoStock {
+  id: string;
+  producto_id: string;
+  tipo_movimiento: 'entrada' | 'salida' | 'ajuste';
+  cantidad: number;
+  motivo: string | null;
+  fecha_movimiento: string;
+  created_at: string;
+}
+
+// Tipos extendidos
 export interface DeudaConCliente extends Deuda {
   cliente: Cliente;
+}
+
+export interface ProductoConCategoria extends Producto {
+  categoria?: Categoria;
 }
