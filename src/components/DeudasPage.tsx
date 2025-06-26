@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DeudaForm } from "./DeudaForm";
 import { AbonoForm } from "./AbonoForm";
+import { PagoCompletoForm } from "./PagoCompletoForm";
 import type { DeudaConCliente } from "@/types";
 
 export function DeudasPage() {
@@ -210,6 +211,7 @@ export function DeudasPage() {
                 const montoTotalGrupo = deudas.reduce((sum, d) => sum + d.monto_total, 0);
                 const montoAbonadoGrupo = deudas.reduce((sum, d) => sum + d.monto_abonado, 0);
                 const montoRestanteGrupo = deudas.reduce((sum, d) => sum + d.monto_restante, 0);
+                const deudasPendientes = deudas.filter(d => d.estado !== 'pagado');
                 
                 return (
                   <Card key={key} className="border-l-4 border-l-orange-500">
@@ -226,13 +228,18 @@ export function DeudasPage() {
                             <span>Restante: ${montoRestanteGrupo.toLocaleString()}</span>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right space-y-2">
                           <Badge 
                             className={montoRestanteGrupo <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
                             variant="outline"
                           >
                             {montoRestanteGrupo <= 0 ? 'Pagado' : 'Pendiente'}
                           </Badge>
+                          {deudasPendientes.length > 1 && (
+                            <div>
+                              <PagoCompletoForm deudas={deudasPendientes} onPagoCreated={fetchDeudas} />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardHeader>

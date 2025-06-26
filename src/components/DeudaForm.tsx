@@ -97,66 +97,108 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
 
   const onSubmit = async (data: DeudaFormData) => {
     try {
-      // Calcular el monto restante después del abono inicial
-      const montoRestante = data.monto_total - data.monto_abonado;
+      console.log('Datos del formulario:', data);
       
-      if (montoRestante <= 0) {
+      // Validar que el monto abonado no sea mayor al total
+      if (data.monto_abonado > data.monto_total) {
         toast({
           title: "Error",
-          description: "El monto abonado no puede ser igual o mayor al monto total",
+          description: "El monto abonado no puede ser mayor al monto total",
           variant: "destructive",
         });
         return;
       }
 
-      // Si hay más de una cuota, crear múltiples deudas
-      if (data.cuotas > 1) {
-        const montoPorCuota = montoRestante / data.cuotas;
-        const deudas = [];
-        
-        for (let i = 0; i < data.cuotas; i++) {
-          const fechaVencimiento = new Date(data.fecha_vencimiento);
-          fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
-          
-          deudas.push({
-            cliente_id: data.cliente_id,
-            concepto: `${data.concepto} - Cuota ${i + 1}/${data.cuotas}`,
-            monto_total: montoPorCuota,
-            monto_abonado: 0,
-            monto_restante: montoPorCuota,
-            fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
-            notas: i === 0 ? `${data.notas || ''} | Abono inicial: $${data.monto_abonado}`.trim() : data.notas || null,
-          });
-        }
+      // Calcular el monto restante después del abono inicial
+      const montoRestante = data.monto_total - data.monto_abonado;
+      
+      console.log('Monto total:', data.monto_total);
+      console.log('Monto abonado:', data.monto_abonado);
+      console.log('Monto restante:', montoRestante);
+      console.log('Cuotas:', data.cuotas);
 
-        const { error } = await supabase
-          .from('deudas')
-          .insert(deudas);
-
-        if (error) throw error;
-      } else {
-        // Una sola deuda
+      // Si el monto restante es 0 o negativo, crear una sola deuda pagada
+      if (montoRestante <= 0) {
         const { error } = await supabase
           .from('deudas')
           .insert([{
             cliente_id: data.cliente_id,
             concepto: data.concepto,
             monto_total: data.monto_total,
-            monto_abonado: data.monto_abonado,
-            monto_restante: montoRestante,
+            monto_abonado: data.monto_total,
+            monto_restante: 0,
             fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
+            estado: 'pagado',
             notas: data.notas || null,
           }]);
 
         if (error) throw error;
-      }
 
-      toast({
-        title: "Deuda creada",
-        description: data.cuotas > 1 
-          ? `Se han creado ${data.cuotas} cuotas de $${(montoRestante / data.cuotas).toLocaleString()} cada una`
-          : "La deuda ha sido registrada exitosamente",
-      });
+        toast({
+          title: "Deuda creada y pagada",
+          description: "La deuda ha sido registrada como pagada completamente",
+        });
+      } else {
+        // Si hay más de una cuota, crear múltiples deudas
+        if (data.cuotas > 1) {
+          const montoPorCuota = montoRestante / data.cuotas;
+          const deudas = [];
+          
+          console.log('Monto por cuota:', montoPorCuota);
+          
+          for (let i = 0; i < data.cuotas; i++) {
+            const fechaVencimiento = new Date(data.fecha_vencimiento);
+            fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
+            
+            deudas.push({
+              cliente_id: data.cliente_id,
+              concepto: `${data.concepto} - Cuota ${i + 1}/${data.cuotas}`,
+              monto_total: montoPorCuota,
+              monto_abonado: 0,
+              monto_restante: montoPorCuota,
+              fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
+              estado: 'pendiente',
+              notas: i === 0 && data.monto_abonado > 0 
+                ? `${data.notas || ''} | Abono inicial: $${data.monto_abonado}`.trim() 
+                : data.notas || null,
+            });
+          }
+
+          console.log('Deudas a insertar:', deudas);
+
+          const { error } = await supabase
+            .from('deudas')
+            .insert(deudas);
+
+          if (error) throw error;
+
+          toast({
+            title: "Deuda creada",
+            description: `Se han creado ${data.cuotas} cuotas de $${montoPorCuota.toLocaleString()} cada una`,
+          });
+        } else {
+          // Una sola deuda
+          const { error } = await supabase
+            .from('deudas')
+            .insert([{
+              cliente_id: data.cliente_id,
+              concepto: data.concepto,
+              monto_total: data.monto_total,
+              monto_abonado: data.monto_abonado,
+              monto_restante: montoRestante,
+              fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
+              estado: 'pendiente',
+              notas: data.notas || null,
+            }]);
+
+          if (error) throw error;
+
+          toast({
+            title: "Deuda creada",
+            description: "La deuda ha sido registrada exitosamente",
+          });
+        }
+      }
 
       form.reset();
       setOpen(false);
@@ -165,7 +207,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
       console.error('Error creating deuda:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear la deuda",
+        description: "No se pudo crear la deuda. Revisa los datos e intenta nuevamente.",
         variant: "destructive",
       });
     }
