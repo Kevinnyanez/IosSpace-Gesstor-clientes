@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, DollarSign, AlertTriangle, Calendar } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DeudaForm } from "./DeudaForm";
+import { AbonoForm } from "./AbonoForm";
 import type { DeudaConCliente } from "@/types";
 
 export function DeudasPage() {
@@ -51,8 +52,14 @@ export function DeudasPage() {
       const recargosAplicados = deudasData
         .reduce((sum, d) => sum + d.recargos, 0);
       
+      const currentMonth = new Date();
       const cobradoMes = deudasData
-        .filter(d => d.estado === 'pagado')
+        .filter(d => {
+          const createdDate = new Date(d.created_at);
+          return d.estado === 'pagado' && 
+                 createdDate.getMonth() === currentMonth.getMonth() &&
+                 createdDate.getFullYear() === currentMonth.getFullYear();
+        })
         .reduce((sum, d) => sum + d.monto_total, 0);
 
       setStats({
@@ -85,11 +92,31 @@ export function DeudasPage() {
     return variants[estado as keyof typeof variants] || variants.pendiente;
   };
 
+  // Agrupar deudas por concepto base (sin el sufijo de cuota)
+  const agruparDeudas = (deudas: DeudaConCliente[]) => {
+    const grupos: { [key: string]: DeudaConCliente[] } = {};
+    
+    deudas.forEach(deuda => {
+      // Extraer el concepto base (sin "- Cuota X/Y")
+      const conceptoBase = deuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
+      const clienteKey = `${deuda.cliente_id}-${conceptoBase}`;
+      
+      if (!grupos[clienteKey]) {
+        grupos[clienteKey] = [];
+      }
+      grupos[clienteKey].push(deuda);
+    });
+    
+    return grupos;
+  };
+
   const filteredDeudas = deudas.filter(deuda =>
     deuda.concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deuda.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deuda.cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const gruposDeudas = agruparDeudas(filteredDeudas);
 
   if (loading) {
     return (
@@ -153,7 +180,7 @@ export function DeudasPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Registro de Deudas ({filteredDeudas.length})</CardTitle>
+            <CardTitle>Registro de Deudas ({Object.keys(gruposDeudas).length} productos)</CardTitle>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -166,7 +193,7 @@ export function DeudasPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredDeudas.length === 0 ? (
+          {Object.keys(gruposDeudas).length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">No hay deudas registradas</p>
               <div className="mt-4">
@@ -174,80 +201,90 @@ export function DeudasPage() {
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left p-4 font-semibold text-gray-700">Cliente</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Concepto</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Monto Total</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Abonado</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Restante</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Recargos</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Vencimiento</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Estado</th>
-                    <th className="text-left p-4 font-semibold text-gray-700">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredDeudas.map((deuda) => (
-                    <tr key={deuda.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-medium text-gray-900">
-                        {deuda.cliente.nombre} {deuda.cliente.apellido}
-                      </td>
-                      <td className="p-4 text-gray-600">
-                        {deuda.concepto}
-                      </td>
-                      <td className="p-4 text-gray-900 font-medium">
-                        ${deuda.monto_total.toLocaleString()}
-                      </td>
-                      <td className="p-4 text-green-600 font-medium">
-                        ${deuda.monto_abonado.toLocaleString()}
-                      </td>
-                      <td className="p-4 font-medium">
-                        <span className={deuda.monto_restante > 0 ? 'text-red-600' : 'text-gray-400'}>
-                          ${deuda.monto_restante.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {deuda.recargos > 0 ? (
-                          <span className="text-orange-600 font-medium">
-                            ${deuda.recargos.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR')}
+            <div className="space-y-6">
+              {Object.entries(gruposDeudas).map(([key, deudas]) => {
+                const primeraDeuda = deudas[0];
+                const conceptoBase = primeraDeuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
+                const totalCuotas = deudas.length;
+                const cuotasPagadas = deudas.filter(d => d.estado === 'pagado').length;
+                const montoTotalGrupo = deudas.reduce((sum, d) => sum + d.monto_total, 0);
+                const montoAbonadoGrupo = deudas.reduce((sum, d) => sum + d.monto_abonado, 0);
+                const montoRestanteGrupo = deudas.reduce((sum, d) => sum + d.monto_restante, 0);
+                
+                return (
+                  <Card key={key} className="border-l-4 border-l-orange-500">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-semibold text-lg text-gray-900">
+                            {primeraDeuda.cliente.nombre} {primeraDeuda.cliente.apellido}
+                          </h3>
+                          <p className="text-gray-600">{conceptoBase}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span>Cuotas: {cuotasPagadas}/{totalCuotas}</span>
+                            <span>Total: ${montoTotalGrupo.toLocaleString()}</span>
+                            <span>Restante: ${montoRestanteGrupo.toLocaleString()}</span>
+                          </div>
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <Badge 
-                          className={getEstadoBadge(deuda.estado).color}
-                          variant="outline"
-                        >
-                          {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          {deuda.estado !== 'pagado' && (
-                            <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700">
-                              Abonar
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm">
-                            Ver
-                          </Button>
+                        <div className="text-right">
+                          <Badge 
+                            className={montoRestanteGrupo <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
+                            variant="outline"
+                          >
+                            {montoRestanteGrupo <= 0 ? 'Pagado' : 'Pendiente'}
+                          </Badge>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {deudas.map((deuda, index) => (
+                          <div key={deuda.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className="w-8 h-8 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-sm font-semibold">
+                                {index + 1}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  ${deuda.monto_total.toLocaleString()}
+                                </p>
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                  <Calendar className="h-4 w-4" />
+                                  {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR')}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right text-sm">
+                                <p className="text-gray-600">
+                                  Abonado: ${deuda.monto_abonado.toLocaleString()}
+                                </p>
+                                <p className={deuda.monto_restante > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>
+                                  Resta: ${deuda.monto_restante.toLocaleString()}
+                                </p>
+                              </div>
+                              <Badge 
+                                className={getEstadoBadge(deuda.estado).color}
+                                variant="outline"
+                              >
+                                {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
+                              </Badge>
+                              <div className="flex items-center gap-2">
+                                {deuda.estado !== 'pagado' && (
+                                  <AbonoForm deuda={deuda} onAbonoCreated={fetchDeudas} />
+                                )}
+                                <Button variant="outline" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </CardContent>

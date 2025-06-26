@@ -95,17 +95,23 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
     }
   };
 
-  const calcularFechaVencimiento = (fechaBase: Date, cuotas: number) => {
-    const fecha = new Date(fechaBase);
-    fecha.setMonth(fecha.getMonth() + cuotas - 1);
-    return fecha;
-  };
-
   const onSubmit = async (data: DeudaFormData) => {
     try {
+      // Calcular el monto restante después del abono inicial
+      const montoRestante = data.monto_total - data.monto_abonado;
+      
+      if (montoRestante <= 0) {
+        toast({
+          title: "Error",
+          description: "El monto abonado no puede ser igual o mayor al monto total",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Si hay más de una cuota, crear múltiples deudas
       if (data.cuotas > 1) {
-        const montoPorCuota = data.monto_total / data.cuotas;
+        const montoPorCuota = montoRestante / data.cuotas;
         const deudas = [];
         
         for (let i = 0; i < data.cuotas; i++) {
@@ -117,8 +123,9 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
             concepto: `${data.concepto} - Cuota ${i + 1}/${data.cuotas}`,
             monto_total: montoPorCuota,
             monto_abonado: 0,
+            monto_restante: montoPorCuota,
             fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
-            notas: data.notas || null,
+            notas: i === 0 ? `${data.notas || ''} | Abono inicial: $${data.monto_abonado}`.trim() : data.notas || null,
           });
         }
 
@@ -136,6 +143,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
             concepto: data.concepto,
             monto_total: data.monto_total,
             monto_abonado: data.monto_abonado,
+            monto_restante: montoRestante,
             fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
             notas: data.notas || null,
           }]);
@@ -146,7 +154,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
       toast({
         title: "Deuda creada",
         description: data.cuotas > 1 
-          ? `Se han creado ${data.cuotas} cuotas exitosamente`
+          ? `Se han creado ${data.cuotas} cuotas de $${(montoRestante / data.cuotas).toLocaleString()} cada una`
           : "La deuda ha sido registrada exitosamente",
       });
 
@@ -242,7 +250,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="monto_abonado"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Monto Abonado</FormLabel>
+                    <FormLabel>Abono Inicial</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -284,7 +292,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="fecha_vencimiento"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Fecha Vencimiento *</FormLabel>
+                    <FormLabel>Primera Cuota Vence *</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
