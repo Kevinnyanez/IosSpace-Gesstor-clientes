@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Clock, User, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { es } from "date-fns/locale";
 import type { DeudaConCliente } from "@/types";
 
 interface EventoCalendario {
@@ -135,6 +136,7 @@ export function CalendarioPage() {
               mode="single"
               selected={date}
               onSelect={setDate}
+              locale={es}
               className="rounded-md border pointer-events-auto"
             />
           </CardContent>

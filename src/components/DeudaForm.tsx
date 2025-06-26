@@ -62,6 +62,7 @@ interface DeudaFormProps {
 export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
   const [open, setOpen] = useState(false);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   
   const form = useForm<DeudaFormData>({
@@ -97,6 +98,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
 
   const onSubmit = async (data: DeudaFormData) => {
     try {
+      setLoading(true);
       console.log('Datos del formulario:', data);
       
       // Validar que el monto abonado no sea mayor al total
@@ -119,20 +121,27 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
 
       // Si el monto restante es 0 o negativo, crear una sola deuda pagada
       if (montoRestante <= 0) {
+        const deudaData = {
+          cliente_id: data.cliente_id,
+          concepto: data.concepto,
+          monto_total: data.monto_total,
+          monto_abonado: data.monto_total,
+          monto_restante: 0,
+          fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
+          estado: 'pagado',
+          notas: data.notas || null,
+        };
+
+        console.log('Insertando deuda pagada:', deudaData);
+        
         const { error } = await supabase
           .from('deudas')
-          .insert([{
-            cliente_id: data.cliente_id,
-            concepto: data.concepto,
-            monto_total: data.monto_total,
-            monto_abonado: data.monto_total,
-            monto_restante: 0,
-            fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
-            estado: 'pagado',
-            notas: data.notas || null,
-          }]);
+          .insert([deudaData]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error insertando deuda:', error);
+          throw error;
+        }
 
         toast({
           title: "Deuda creada y pagada",
@@ -150,7 +159,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
             const fechaVencimiento = new Date(data.fecha_vencimiento);
             fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
             
-            deudas.push({
+            const deudaData = {
               cliente_id: data.cliente_id,
               concepto: `${data.concepto} - Cuota ${i + 1}/${data.cuotas}`,
               monto_total: montoPorCuota,
@@ -161,16 +170,21 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               notas: i === 0 && data.monto_abonado > 0 
                 ? `${data.notas || ''} | Abono inicial: $${data.monto_abonado}`.trim() 
                 : data.notas || null,
-            });
+            };
+            
+            deudas.push(deudaData);
           }
 
-          console.log('Deudas a insertar:', deudas);
+          console.log('Insertando deudas múltiples:', deudas);
 
           const { error } = await supabase
             .from('deudas')
             .insert(deudas);
 
-          if (error) throw error;
+          if (error) {
+            console.error('Error insertando deudas:', error);
+            throw error;
+          }
 
           toast({
             title: "Deuda creada",
@@ -178,20 +192,27 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
           });
         } else {
           // Una sola deuda
+          const deudaData = {
+            cliente_id: data.cliente_id,
+            concepto: data.concepto,
+            monto_total: data.monto_total,
+            monto_abonado: data.monto_abonado,
+            monto_restante: montoRestante,
+            fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
+            estado: 'pendiente',
+            notas: data.notas || null,
+          };
+
+          console.log('Insertando deuda única:', deudaData);
+
           const { error } = await supabase
             .from('deudas')
-            .insert([{
-              cliente_id: data.cliente_id,
-              concepto: data.concepto,
-              monto_total: data.monto_total,
-              monto_abonado: data.monto_abonado,
-              monto_restante: montoRestante,
-              fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
-              estado: 'pendiente',
-              notas: data.notas || null,
-            }]);
+            .insert([deudaData]);
 
-          if (error) throw error;
+          if (error) {
+            console.error('Error insertando deuda:', error);
+            throw error;
+          }
 
           toast({
             title: "Deuda creada",
@@ -207,9 +228,11 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
       console.error('Error creating deuda:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear la deuda. Revisa los datos e intenta nuevamente.",
+        description: `No se pudo crear la deuda: ${error.message || 'Error desconocido'}`,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -389,7 +412,9 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit">Crear Deuda</Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Creando..." : "Crear Deuda"}
+              </Button>
             </div>
           </form>
         </Form>

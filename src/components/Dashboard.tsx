@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, CreditCard, AlertTriangle, Calendar as CalendarIcon, SidebarOpen } from "lucide-react";
@@ -8,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DeudaConCliente } from "@/types";
 import { format, addDays, isToday, isPast } from "date-fns";
 import { es } from "date-fns/locale";
+import { ExchangeRateCard } from "./ExchangeRateCard";
 
 export function Dashboard() {
   // Consulta para obtener total de clientes
@@ -93,7 +93,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Clientes"
           value={clientes.length}
@@ -112,6 +112,7 @@ export function Dashboard() {
           icon={AlertTriangle}
           color="text-red-600"
         />
+        <ExchangeRateCard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
