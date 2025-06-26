@@ -46,7 +46,7 @@ export function InventarioPage() {
     {
       id: '3',
       nombre: 'Producto C',
-      descripción: 'Descripción del producto C',
+      descripcion: 'Descripción del producto C',
       precio: 850,
       stock_actual: 50,
       stock_minimo: 20,
