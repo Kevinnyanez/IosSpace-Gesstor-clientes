@@ -30,9 +30,19 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-gray-200">
       <SidebarHeader className="p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <h2 className="text-xl font-bold text-blue-900">GestorPro</h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-blue-900">IoSpace Control</h2>
+          </div>
+          <div className="flex-shrink-0">
+            <img 
+              src="/lovable-uploads/139ccb2f-7ba1-4720-9a2e-04dbfc1f46a3.png" 
+              alt="Appy Studios" 
+              className="w-8 h-8 object-contain opacity-70"
+            />
+          </div>
         </div>
+        <p className="text-xs text-gray-500 mt-1">Powered by Appy Studios</p>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

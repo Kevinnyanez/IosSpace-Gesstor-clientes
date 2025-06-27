@@ -29,6 +29,7 @@ export function InventarioPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [editingProducto, setEditingProducto] = useState<ProductoConCategoria | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -342,6 +343,17 @@ export function InventarioPage() {
           onSuccess={() => {
             fetchCategorias();
             setShowCategoryForm(false);
+          }}
+        />
+      )}
+
+      {editingCategoria && (
+        <CategoriaForm
+          categoria={editingCategoria}
+          onClose={() => setEditingCategoria(null)}
+          onSuccess={() => {
+            fetchCategorias();
+            setEditingCategoria(null);
           }}
         />
       )}

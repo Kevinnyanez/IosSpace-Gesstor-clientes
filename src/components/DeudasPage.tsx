@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2 } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   AlertDialog,
@@ -124,6 +124,42 @@ export function DeudasPage() {
       toast({
         title: "Error",
         description: "No se pudo eliminar la deuda",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteGrupoDeudas = async (deudas: DeudaConCliente[]) => {
+    try {
+      const deudaIds = deudas.map(d => d.id);
+      
+      // Eliminar todos los pagos relacionados
+      const { error: pagosError } = await supabase
+        .from('pagos')
+        .delete()
+        .in('deuda_id', deudaIds);
+
+      if (pagosError) throw pagosError;
+
+      // Eliminar todas las deudas del grupo
+      const { error: deudasError } = await supabase
+        .from('deudas')
+        .delete()
+        .in('id', deudaIds);
+
+      if (deudasError) throw deudasError;
+
+      toast({
+        title: "Deudas eliminadas",
+        description: `Se eliminaron ${deudas.length} cuotas correctamente`,
+      });
+
+      fetchDeudas();
+    } catch (error) {
+      console.error('Error deleting grupo deudas:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar las deudas",
         variant: "destructive",
       });
     }
@@ -277,12 +313,39 @@ export function DeudasPage() {
                           </div>
                         </div>
                         <div className="text-right space-y-2">
-                          <Badge 
-                            className={montoRestanteGrupo <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
-                            variant="outline"
-                          >
-                            {montoRestanteGrupo <= 0 ? 'Pagado' : 'Pendiente'}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              className={montoRestanteGrupo <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
+                              variant="outline"
+                            >
+                              {montoRestanteGrupo <= 0 ? 'Pagado' : 'Pendiente'}
+                            </Badge>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                  <X className="h-4 w-4 mr-1" />
+                                  Eliminar Todas
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar todas las cuotas?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción eliminará permanentemente todas las {totalCuotas} cuotas de "{conceptoBase}" y todos sus pagos asociados. Esta acción no se puede deshacer.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteGrupoDeudas(deudas)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar Todas
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                           {deudasPendientes.length > 1 && (
                             <div>
                               <PagoCompletoForm deudas={deudasPendientes} onPagoCreated={fetchDeudas} />
