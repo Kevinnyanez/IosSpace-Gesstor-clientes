@@ -1,129 +1,128 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Clock, User, AlertTriangle } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, AlertTriangle } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format, isSameDay, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DeudaConCliente } from "@/types";
 
-interface EventoCalendario {
-  id: string;
-  titulo: string;
-  fecha: Date;
-  tipo: 'vencimiento' | 'vencido' | 'proximo_vencimiento';
-  descripcion: string;
-  cliente: string;
-  monto: number;
-}
-
 export function CalendarioPage() {
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [eventos, setEventos] = useState<EventoCalendario[]>([]);
-  const [stats, setStats] = useState({
-    vencimientos: 0,
-    vencidos: 0,
-    proximosVencimientos: 0
-  });
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [deudas, setDeudas] = useState<DeudaConCliente[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchEventosDeudas();
+    fetchDeudas();
   }, []);
 
-  const fetchEventosDeudas = async () => {
+  const fetchDeudas = async () => {
     try {
-      const hoy = new Date();
-      const enUnMes = new Date();
-      enUnMes.setMonth(enUnMes.getMonth() + 1);
-
       const { data, error } = await supabase
         .from('deudas')
         .select(`
           *,
           cliente:clientes(*)
         `)
-        .neq('estado', 'pagado')
-        .lte('fecha_vencimiento', enUnMes.toISOString().split('T')[0])
-        .order('fecha_vencimiento');
+        .eq('estado', 'pendiente')
+        .order('fecha_vencimiento', { ascending: true });
 
       if (error) throw error;
-
-      const eventosGenerados: EventoCalendario[] = [];
-      let vencimientos = 0;
-      let vencidos = 0;
-      let proximosVencimientos = 0;
-
-      data?.forEach((deuda) => {
-        const fechaVencimiento = new Date(deuda.fecha_vencimiento);
-        const esVencido = fechaVencimiento < hoy;
-        const esHoy = fechaVencimiento.toDateString() === hoy.toDateString();
-        const esProximo = fechaVencimiento > hoy && fechaVencimiento <= enUnMes;
-
-        let tipo: 'vencimiento' | 'vencido' | 'proximo_vencimiento';
-        if (esVencido) {
-          tipo = 'vencido';
-          vencidos++;
-        } else if (esHoy) {
-          tipo = 'vencimiento';
-          vencimientos++;
-        } else {
-          tipo = 'proximo_vencimiento';
-          proximosVencimientos++;
-        }
-
-        eventosGenerados.push({
-          id: deuda.id,
-          titulo: `${esVencido ? 'VENCIDO - ' : esHoy ? 'VENCE HOY - ' : 'Vencimiento - '}${deuda.cliente.nombre} ${deuda.cliente.apellido}`,
-          fecha: fechaVencimiento,
-          tipo,
-          descripcion: `${deuda.concepto} - $${deuda.monto_restante.toLocaleString()}`,
-          cliente: `${deuda.cliente.nombre} ${deuda.cliente.apellido}`,
-          monto: deuda.monto_restante
-        });
-      });
-
-      setEventos(eventosGenerados);
-      setStats({ vencimientos, vencidos, proximosVencimientos });
-
+      setDeudas(data || []);
     } catch (error) {
-      console.error('Error fetching eventos:', error);
+      console.error('Error fetching deudas:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los eventos",
+        description: "No se pudieron cargar las deudas",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getEventBadge = (tipo: string) => {
-    const tipos = {
-      'vencido': { color: 'bg-red-100 text-red-700', icon: AlertTriangle },
-      'vencimiento': { color: 'bg-orange-100 text-orange-700', icon: Clock },
-      'proximo_vencimiento': { color: 'bg-blue-100 text-blue-700', icon: CalendarIcon }
-    };
-    return tipos[tipo as keyof typeof tipos] || tipos.proximo_vencimiento;
-  };
+  // Filtrar deudas por fecha seleccionada
+  const deudasDelDia = deudas.filter(deuda =>
+    isSameDay(new Date(deuda.fecha_vencimiento), selectedDate)
+  );
 
-  // Filtrar eventos para mostrar solo los más próximos (próximos 30 días)
-  const eventosProximos = eventos
-    .sort((a, b) => a.fecha.getTime() - b.fecha.getTime())
-    .slice(0, 10);
+  // Obtener fechas con deudas para resaltar en el calendario
+  const fechasConDeudas = deudas.map(deuda => new Date(deuda.fecha_vencimiento));
+
+  // Estadísticas del mes actual
+  const inicioMes = startOfMonth(selectedDate);
+  const finMes = endOfMonth(selectedDate);
+  
+  const deudasDelMes = deudas.filter(deuda => {
+    const fechaVencimiento = new Date(deuda.fecha_vencimiento);
+    return fechaVencimiento >= inicioMes && fechaVencimiento <= finMes;
+  });
+
+  const montoTotalMes = deudasDelMes.reduce((sum, deuda) => sum + deuda.monto_restante, 0);
+  const deudasVencidasMes = deudasDelMes.filter(deuda => 
+    new Date(deuda.fecha_vencimiento) < new Date()
+  );
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-lg">Cargando calendario...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <SidebarTrigger />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Calendario de Vencimientos</h1>
-          <p className="text-gray-600 mt-2">Gestiona fechas de vencimiento y eventos importantes</p>
+          <p className="text-gray-600 mt-2">Visualiza las fechas de vencimiento de las deudas</p>
         </div>
-        <Button className="bg-purple-600 hover:bg-purple-700" onClick={fetchEventosDeudas}>
-          <CalendarIcon className="h-4 w-4 mr-2" />
-          Actualizar
-        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Deudas del Mes</CardTitle>
+            <CalendarIcon className="h-5 w-5 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{deudasDelMes.length}</div>
+            <p className="text-xs text-gray-600 mt-1">
+              {format(selectedDate, 'MMMM yyyy', { locale: es })}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Monto del Mes</CardTitle>
+            <DollarSign className="h-5 w-5 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${montoTotalMes.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-600 mt-1">total a cobrar</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Vencidas</CardTitle>
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{deudasVencidasMes.length}</div>
+            <p className="text-xs text-gray-600 mt-1">deudas vencidas</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -134,91 +133,67 @@ export function CalendarioPage() {
           <CardContent>
             <Calendar
               mode="single"
-              selected={date}
-              onSelect={setDate}
+              selected={selectedDate}
+              onSelect={(date) => date && setSelectedDate(date)}
               locale={es}
-              className="rounded-md border pointer-events-auto"
+              className="rounded-md border"
+              modifiers={{
+                deuda: fechasConDeudas,
+              }}
+              modifiersStyles={{
+                deuda: { 
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                  fontWeight: 'bold'
+                }
+              }}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Próximos Vencimientos</CardTitle>
+            <CardTitle>
+              Deudas del {format(selectedDate, 'dd/MM/yyyy', { locale: es })}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {eventosProximos.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No hay vencimientos próximos</p>
-              ) : (
-                eventosProximos.map((evento) => {
-                  const badge = getEventBadge(evento.tipo);
-                  const Icon = badge.icon;
-                  return (
-                    <div key={evento.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${badge.color}`}>
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-gray-900">{evento.titulo}</h3>
-                            <p className="text-sm text-gray-600">{evento.descripcion}</p>
-                          </div>
-                        </div>
-                        <Badge className={badge.color} variant="outline">
-                          ${evento.monto.toLocaleString()}
-                        </Badge>
+            {deudasDelDia.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                No hay deudas programadas para esta fecha
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {deudasDelDia.map((deuda) => (
+                  <div key={deuda.id} className="p-4 border rounded-lg bg-gray-50">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold">
+                          {deuda.cliente.nombre} {deuda.cliente.apellido}
+                        </h3>
+                        <p className="text-sm text-gray-600">{deuda.concepto}</p>
+                        <p className="text-lg font-bold text-orange-600 mt-1">
+                          ${deuda.monto_restante.toLocaleString()}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        {evento.fecha.toLocaleDateString('es-AR')}
-                      </div>
+                      <Badge 
+                        variant={new Date(deuda.fecha_vencimiento) < new Date() ? "destructive" : "default"}
+                      >
+                        {new Date(deuda.fecha_vencimiento) < new Date() ? "Vencida" : "Pendiente"}
+                      </Badge>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    {deuda.cliente.telefono && (
+                      <div className="mt-2 text-sm text-gray-500">
+                        📞 {deuda.cliente.telefono}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumen de Vencimientos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-red-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-8 w-8 text-red-600" />
-                <div>
-                  <p className="text-2xl font-bold text-red-600">{stats.vencidos}</p>
-                  <p className="text-sm text-red-700">Vencidos</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-orange-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Clock className="h-8 w-8 text-orange-600" />
-                <div>
-                  <p className="text-2xl font-bold text-orange-600">{stats.vencimientos}</p>
-                  <p className="text-sm text-orange-700">Vencen Hoy</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <CalendarIcon className="h-8 w-8 text-blue-600" />
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{stats.proximosVencimientos}</p>
-                  <p className="text-sm text-blue-700">Próximos 30 días</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

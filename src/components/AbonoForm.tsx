@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, DollarSign } from 'lucide-react';
+import { Calendar as CalendarIcon, CreditCard } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -70,27 +70,25 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
         return;
       }
 
-      // Registrar el pago
+      // Crear el pago
       const { error: pagoError } = await supabase
         .from('pagos')
-        .insert([{
+        .insert({
           deuda_id: deuda.id,
           monto: data.monto,
           fecha_pago: data.fecha_pago.toISOString().split('T')[0],
-        }]);
+        });
 
       if (pagoError) throw pagoError;
 
       // Actualizar la deuda
       const nuevoMontoAbonado = deuda.monto_abonado + data.monto;
-      const nuevoMontoRestante = deuda.monto_total - nuevoMontoAbonado;
-      const nuevoEstado = nuevoMontoRestante <= 0 ? 'pagado' : 'pendiente';
+      const nuevoEstado = nuevoMontoAbonado >= deuda.monto_total ? 'pagado' : 'pendiente';
 
       const { error: deudaError } = await supabase
         .from('deudas')
         .update({
           monto_abonado: nuevoMontoAbonado,
-          monto_restante: nuevoMontoRestante,
           estado: nuevoEstado,
         })
         .eq('id', deuda.id);
@@ -99,9 +97,7 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
 
       toast({
         title: "Abono registrado",
-        description: nuevoEstado === 'pagado' 
-          ? "La deuda ha sido pagada completamente"
-          : `Abono de $${data.monto.toLocaleString()} registrado exitosamente`,
+        description: `Se registró un abono de $${data.monto.toLocaleString()}`,
       });
 
       form.reset();
@@ -120,8 +116,8 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700">
-          <DollarSign className="h-4 w-4 mr-1" />
+        <Button variant="outline" size="sm">
+          <CreditCard className="h-4 w-4 mr-1" />
           Abonar
         </Button>
       </DialogTrigger>
@@ -141,7 +137,7 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
               name="monto"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto a Abonar *</FormLabel>
+                  <FormLabel>Monto del Abono *</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 

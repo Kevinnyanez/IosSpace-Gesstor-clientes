@@ -1,10 +1,21 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, DollarSign, AlertTriangle, Calendar, Eye } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2 } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DeudaForm } from "./DeudaForm";
@@ -84,6 +95,40 @@ export function DeudasPage() {
     }
   };
 
+  const handleDeleteDeuda = async (deudaId: string) => {
+    try {
+      // Primero eliminar pagos relacionados
+      const { error: pagosError } = await supabase
+        .from('pagos')
+        .delete()
+        .eq('deuda_id', deudaId);
+
+      if (pagosError) throw pagosError;
+
+      // Luego eliminar la deuda
+      const { error: deudaError } = await supabase
+        .from('deudas')
+        .delete()
+        .eq('id', deudaId);
+
+      if (deudaError) throw deudaError;
+
+      toast({
+        title: "Deuda eliminada",
+        description: "La deuda se eliminó correctamente",
+      });
+
+      fetchDeudas();
+    } catch (error) {
+      console.error('Error deleting deuda:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la deuda",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getEstadoBadge = (estado: string) => {
     const variants = {
       'pendiente': { variant: 'default' as const, color: 'text-yellow-700 bg-yellow-100' },
@@ -130,9 +175,12 @@ export function DeudasPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Deudas</h1>
-          <p className="text-gray-600 mt-2">Controla los pagos y saldos pendientes</p>
+        <div className="flex items-center gap-4">
+          <SidebarTrigger />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Gestión de Deudas</h1>
+            <p className="text-gray-600 mt-2">Controla los pagos y saldos pendientes</p>
+          </div>
         </div>
         <DeudaForm onDeudaCreated={fetchDeudas} />
       </div>
@@ -283,6 +331,30 @@ export function DeudasPage() {
                                 <Button variant="outline" size="sm">
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción eliminará permanentemente la deuda y todos sus pagos asociados. Esta acción no se puede deshacer.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => handleDeleteDeuda(deuda.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
                             </div>
                           </div>

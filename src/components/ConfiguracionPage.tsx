@@ -4,17 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Percent, Calendar, DollarSign, Save } from "lucide-react";
+import { Settings, Save, Percent, Calendar, DollarSign } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Configuracion } from "@/types";
 
 export function ConfiguracionPage() {
-  const { toast } = useToast();
+  const [config, setConfig] = useState<Configuracion | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [config, setConfig] = useState<Configuracion | null>(null);
+  const [formData, setFormData] = useState({
+    porcentaje_recargo: 10,
+    dias_para_recargo: 30,
+    moneda_default: 'ARS'
+  });
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchConfiguracion();
@@ -25,10 +30,19 @@ export function ConfiguracionPage() {
       const { data, error } = await supabase
         .from('configuracion')
         .select('*')
+        .limit(1)
         .single();
 
-      if (error) throw error;
-      setConfig(data);
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      if (data) {
+        setConfig(data);
+        setFormData({
+          porcentaje_recargo: data.porcentaje_recargo,
+          dias_para_recargo: data.dias_para_recargo,
+          moneda_default: data.moneda_default
+        });
+      }
     } catch (error) {
       console.error('Error fetching configuracion:', error);
       toast({
@@ -41,26 +55,34 @@ export function ConfiguracionPage() {
     }
   };
 
-  const handleSave = async () => {
-    if (!config) return;
-
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('configuracion')
-        .update({
-          porcentaje_recargo: config.porcentaje_recargo,
-          dias_para_recargo: config.dias_para_recargo,
-          moneda_default: config.moneda_default
-        })
-        .eq('id', config.id);
 
-      if (error) throw error;
+    try {
+      if (config) {
+        // Actualizar configuración existente
+        const { error } = await supabase
+          .from('configuracion')
+          .update(formData)
+          .eq('id', config.id);
+
+        if (error) throw error;
+      } else {
+        // Crear nueva configuración
+        const { error } = await supabase
+          .from('configuracion')
+          .insert(formData);
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Configuración guardada",
-        description: "Los cambios se han aplicado correctamente.",
+        description: "Los cambios se han guardado correctamente",
       });
+
+      fetchConfiguracion();
     } catch (error) {
       console.error('Error saving configuracion:', error);
       toast({
@@ -73,6 +95,26 @@ export function ConfiguracionPage() {
     }
   };
 
+  const aplicarRecargos = async () => {
+    try {
+      const { error } = await supabase.rpc('aplicar_recargos_vencidos');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Recargos aplicados",
+        description: "Se han aplicado los recargos a las deudas vencidas",
+      });
+    } catch (error) {
+      console.error('Error aplicando recargos:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron aplicar los recargos",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -81,20 +123,13 @@ export function ConfiguracionPage() {
     );
   }
 
-  if (!config) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="text-lg text-red-600">Error al cargar la configuración</div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <SidebarTrigger />
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
-          <p className="text-gray-600 mt-2">Personaliza el comportamiento de la aplicación</p>
+          <h1 className="text-3xl font-bold text-gray-900">Configuración del Sistema</h1>
+          <p className="text-gray-600 mt-2">Ajusta los parámetros generales de la aplicación</p>
         </div>
       </div>
 
@@ -102,130 +137,121 @@ export function ConfiguracionPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Percent className="h-5 w-5 text-blue-600" />
-              Recargos Automáticos
+              <Settings className="h-5 w-5" />
+              Configuración General
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="porcentaje">Porcentaje de Recargo (%)</Label>
-              <Input
-                id="porcentaje"
-                type="number"
-                step="0.01"
-                value={config.porcentaje_recargo}
-                onChange={(e) => setConfig({...config, porcentaje_recargo: Number(e.target.value)})}
-                className="mt-2"
-              />
-              <p className="text-sm text-gray-600 mt-1">
-                Porcentaje que se aplicará como recargo por mora
-              </p>
-            </div>
-            
-            <div>
-              <Label htmlFor="dias">Días para Aplicar Recargo</Label>
-              <Input
-                id="dias"
-                type="number"
-                value={config.dias_para_recargo}
-                onChange={(e) => setConfig({...config, dias_para_recargo: Number(e.target.value)})}
-                className="mt-2"
-              />
-              <p className="text-sm text-gray-600 mt-1">
-                Cantidad de días después del vencimiento para aplicar recargo
-              </p>
-            </div>
+          <CardContent>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <Label htmlFor="porcentaje_recargo" className="flex items-center gap-2">
+                  <Percent className="h-4 w-4" />
+                  Porcentaje de Recargo (%)
+                </Label>
+                <Input
+                  id="porcentaje_recargo"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.porcentaje_recargo}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    porcentaje_recargo: parseFloat(e.target.value) || 0
+                  })}
+                  placeholder="10.00"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Porcentaje que se aplicará como recargo a las deudas vencidas
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="dias_para_recargo" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Días para Aplicar Recargo
+                </Label>
+                <Input
+                  id="dias_para_recargo"
+                  type="number"
+                  min="1"
+                  value={formData.dias_para_recargo}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    dias_para_recargo: parseInt(e.target.value) || 30
+                  })}
+                  placeholder="30"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Cantidad de días después del vencimiento para aplicar recargo
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="moneda_default" className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Moneda por Defecto
+                </Label>
+                <Input
+                  id="moneda_default"
+                  type="text"
+                  value={formData.moneda_default}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    moneda_default: e.target.value
+                  })}
+                  placeholder="ARS"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Código de la moneda utilizada en el sistema (ej: ARS, USD, EUR)
+                </p>
+              </div>
+
+              <Button type="submit" disabled={saving} className="w-full">
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Guardando...' : 'Guardar Configuración'}
+              </Button>
+            </form>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              Configuración General
-            </CardTitle>
+            <CardTitle>Acciones del Sistema</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="moneda">Moneda por Defecto</Label>
-              <Select 
-                value={config.moneda_default} 
-                onValueChange={(value) => setConfig({...config, moneda_default: value})}
-              >
-                <SelectTrigger className="mt-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ARS">Peso Argentino (ARS)</SelectItem>
-                  <SelectItem value="USD">Dólar Estadounidense (USD)</SelectItem>
-                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">Aplicar Recargos</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Aplica recargos automáticamente a las deudas que han superado el período de gracia.
+              </p>
+              <Button onClick={aplicarRecargos} variant="outline" className="w-full">
+                Aplicar Recargos Vencidos
+              </Button>
             </div>
+
+            <div className="p-4 border rounded-lg bg-blue-50">
+              <h3 className="font-semibold mb-2 text-blue-900">Información</h3>
+              <div className="text-sm text-blue-800 space-y-1">
+                <p>• Los recargos se calculan sobre el monto restante de la deuda</p>
+                <p>• Solo se aplican a deudas en estado "pendiente"</p>
+                <p>• Una vez aplicado, el estado cambia a "vencido"</p>
+                <p>• No se aplican recargos múltiples a la misma deuda</p>
+              </div>
+            </div>
+
+            {config && (
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <h3 className="font-semibold mb-2">Estado Actual</h3>
+                <div className="text-sm space-y-1">
+                  <p><strong>Recargo:</strong> {config.porcentaje_recargo}%</p>
+                  <p><strong>Días de gracia:</strong> {config.dias_para_recargo} días</p>
+                  <p><strong>Moneda:</strong> {config.moneda_default}</p>
+                  <p><strong>Última actualización:</strong> {new Date(config.updated_at).toLocaleString('es-AR')}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-gray-600" />
-            Resumen de Configuración
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Percent className="h-8 w-8 text-blue-600" />
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{config.porcentaje_recargo}%</p>
-                  <p className="text-sm text-blue-700">Recargo por Mora</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-orange-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-8 w-8 text-orange-600" />
-                <div>
-                  <p className="text-2xl font-bold text-orange-600">{config.dias_para_recargo}</p>
-                  <p className="text-sm text-orange-700">Días de Gracia</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-green-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-8 w-8 text-green-600" />
-                <div>
-                  <p className="text-2xl font-bold text-green-600">{config.moneda_default}</p>
-                  <p className="text-sm text-green-700">Moneda Default</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-2">Cómo Funcionan los Recargos</h3>
-            <p className="text-sm text-gray-600">
-              Cuando una deuda pase {config.dias_para_recargo} días de su fecha de vencimiento, 
-              automáticamente se aplicará un recargo del {config.porcentaje_recargo}% sobre el monto pendiente. 
-              Este proceso se ejecuta diariamente para mantener los saldos actualizados.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button 
-          onClick={handleSave} 
-          disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Guardando...' : 'Guardar Configuración'}
-        </Button>
       </div>
     </div>
   );

@@ -88,22 +88,14 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
       if (pagoError) throw pagoError;
 
       // Actualizar todas las deudas como pagadas
-      const actualizaciones = deudas.map(deuda => ({
-        id: deuda.id,
-        monto_abonado: deuda.monto_total,
-        monto_restante: 0,
-        estado: 'pagado',
-      }));
-
-      for (const actualizacion of actualizaciones) {
+      for (const deuda of deudas) {
         const { error: deudaError } = await supabase
           .from('deudas')
           .update({
-            monto_abonado: actualizacion.monto_abonado,
-            monto_restante: actualizacion.monto_restante,
-            estado: actualizacion.estado,
+            monto_abonado: deuda.monto_total,
+            estado: 'pagado',
           })
-          .eq('id', actualizacion.id);
+          .eq('id', deuda.id);
 
         if (deudaError) throw deudaError;
       }
