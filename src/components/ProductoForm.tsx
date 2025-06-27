@@ -26,7 +26,7 @@ export function ProductoForm({ producto, onClose, onSuccess }: ProductoFormProps
     precio: producto?.precio || 0,
     stock_actual: producto?.stock_actual || 0,
     stock_minimo: producto?.stock_minimo || 0,
-    categoria_id: producto?.categoria_id || '',
+    categoria_id: producto?.categoria_id || null,
     codigo: producto?.codigo || '',
     activo: producto?.activo ?? true
   });
@@ -215,14 +215,14 @@ export function ProductoForm({ producto, onClose, onSuccess }: ProductoFormProps
             <div>
               <Label htmlFor="categoria">Categoría</Label>
               <Select 
-                value={formData.categoria_id} 
-                onValueChange={(value) => setFormData({ ...formData, categoria_id: value })}
+                value={formData.categoria_id || "sin-categoria"} 
+                onValueChange={(value) => setFormData({ ...formData, categoria_id: value === "sin-categoria" ? null : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin categoría</SelectItem>
+                  <SelectItem value="sin-categoria">Sin categoría</SelectItem>
                   {categorias.map((categoria) => (
                     <SelectItem key={categoria.id} value={categoria.id}>
                       {categoria.nombre}

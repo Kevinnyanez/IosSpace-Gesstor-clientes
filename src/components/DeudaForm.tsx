@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -126,7 +125,6 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
           concepto: data.concepto,
           monto_total: data.monto_total,
           monto_abonado: data.monto_total,
-          monto_restante: 0,
           fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
           estado: 'pagado',
           notas: data.notas || null,
@@ -164,7 +162,6 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               concepto: `${data.concepto} - Cuota ${i + 1}/${data.cuotas}`,
               monto_total: montoPorCuota,
               monto_abonado: 0,
-              monto_restante: montoPorCuota,
               fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
               estado: 'pendiente',
               notas: i === 0 && data.monto_abonado > 0 
@@ -197,7 +194,6 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
             concepto: data.concepto,
             monto_total: data.monto_total,
             monto_abonado: data.monto_abonado,
-            monto_restante: montoRestante,
             fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
             estado: 'pendiente',
             notas: data.notas || null,
