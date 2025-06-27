@@ -32,7 +32,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-blue-900">IoSpace Control</h2>
+            <h2 className="text-xl font-bold text-blue-900">IosSpace27</h2>
           </div>
           <div className="flex-shrink-0">
             <img 
