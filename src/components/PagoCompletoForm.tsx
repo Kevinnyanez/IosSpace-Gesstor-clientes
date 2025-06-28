@@ -54,6 +54,7 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
   const montoTotalRestante = deudas.reduce((sum, deuda) => sum + deuda.monto_restante, 0);
   const conceptoBase = deudas[0]?.concepto.replace(/ - Cuota \d+\/\d+/, '') || '';
   const cliente = deudas[0]?.cliente;
+  const moneda = deudas[0]?.moneda || 'ARS';
   
   const form = useForm<PagoCompletoFormData>({
     resolver: zodResolver(pagoCompletoFormSchema),
@@ -79,6 +80,7 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
         deuda_id: deuda.id,
         monto: deuda.monto_restante,
         fecha_pago: data.fecha_pago.toISOString().split('T')[0],
+        moneda: deuda.moneda,
       }));
 
       const { error: pagoError } = await supabase
@@ -137,7 +139,7 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
             <p><strong>Cliente:</strong> {cliente?.nombre} {cliente?.apellido}</p>
             <p><strong>Concepto:</strong> {conceptoBase}</p>
             <p><strong>Cuotas a pagar:</strong> {deudas.filter(d => d.estado !== 'pagado').length}</p>
-            <p><strong>Total a pagar:</strong> ${montoTotalRestante.toLocaleString()}</p>
+            <p><strong>Total a pagar:</strong> {MONEDAS[moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoTotalRestante.toLocaleString()} {moneda}</p>
           </div>
         </DialogHeader>
         <Form {...form}>
@@ -147,7 +149,7 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
               name="monto"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto Total a Pagar *</FormLabel>
+                  <FormLabel>Monto Total a Pagar ({moneda}) *</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 

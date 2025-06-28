@@ -77,6 +77,7 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
           deuda_id: deuda.id,
           monto: data.monto,
           fecha_pago: data.fecha_pago.toISOString().split('T')[0],
+          moneda: deuda.moneda,
         });
 
       if (pagoError) throw pagoError;
@@ -97,7 +98,7 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
 
       toast({
         title: "Abono registrado",
-        description: `Se registró un abono de $${data.monto.toLocaleString()}`,
+        description: `Se registró un abono de ${MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}${data.monto.toLocaleString()}`,
       });
 
       form.reset();
@@ -127,7 +128,7 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
           <div className="text-sm text-gray-600">
             <p><strong>Cliente:</strong> {deuda.cliente.nombre} {deuda.cliente.apellido}</p>
             <p><strong>Concepto:</strong> {deuda.concepto}</p>
-            <p><strong>Saldo restante:</strong> ${deuda.monto_restante.toLocaleString()}</p>
+            <p><strong>Saldo restante:</strong> {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{deuda.monto_restante.toLocaleString()} {deuda.moneda}</p>
           </div>
         </DialogHeader>
         <Form {...form}>
@@ -137,7 +138,7 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
               name="monto"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto del Abono *</FormLabel>
+                  <FormLabel>Monto del Abono ({deuda.moneda}) *</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 

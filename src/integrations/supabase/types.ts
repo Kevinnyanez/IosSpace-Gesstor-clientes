@@ -111,6 +111,7 @@ export type Database = {
           fecha_creacion: string
           fecha_vencimiento: string
           id: string
+          moneda: string
           monto_abonado: number
           monto_restante: number | null
           monto_total: number
@@ -126,6 +127,7 @@ export type Database = {
           fecha_creacion?: string
           fecha_vencimiento: string
           id?: string
+          moneda?: string
           monto_abonado?: number
           monto_restante?: number | null
           monto_total: number
@@ -141,6 +143,7 @@ export type Database = {
           fecha_creacion?: string
           fecha_vencimiento?: string
           id?: string
+          moneda?: string
           monto_abonado?: number
           monto_restante?: number | null
           monto_total?: number
@@ -157,6 +160,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      historial_pagos: {
+        Row: {
+          cliente_nombre: string
+          concepto: string
+          created_at: string
+          deuda_id: string | null
+          fecha_pago: string
+          id: string
+          metodo_pago: string | null
+          moneda: string
+          monto_pago: number
+          notas: string | null
+        }
+        Insert: {
+          cliente_nombre: string
+          concepto: string
+          created_at?: string
+          deuda_id?: string | null
+          fecha_pago: string
+          id?: string
+          metodo_pago?: string | null
+          moneda?: string
+          monto_pago: number
+          notas?: string | null
+        }
+        Update: {
+          cliente_nombre?: string
+          concepto?: string
+          created_at?: string
+          deuda_id?: string | null
+          fecha_pago?: string
+          id?: string
+          metodo_pago?: string | null
+          moneda?: string
+          monto_pago?: number
+          notas?: string | null
+        }
+        Relationships: []
       }
       movimientos_stock: {
         Row: {
@@ -203,6 +245,7 @@ export type Database = {
           fecha_pago: string
           id: string
           metodo_pago: string | null
+          moneda: string
           monto: number
           notas: string | null
         }
@@ -212,6 +255,7 @@ export type Database = {
           fecha_pago?: string
           id?: string
           metodo_pago?: string | null
+          moneda?: string
           monto: number
           notas?: string | null
         }
@@ -221,6 +265,7 @@ export type Database = {
           fecha_pago?: string
           id?: string
           metodo_pago?: string | null
+          moneda?: string
           monto?: number
           notas?: string | null
         }
@@ -242,6 +287,7 @@ export type Database = {
           created_at: string
           descripcion: string | null
           id: string
+          moneda: string
           nombre: string
           precio: number
           stock_actual: number
@@ -255,6 +301,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          moneda?: string
           nombre: string
           precio: number
           stock_actual?: number
@@ -268,6 +315,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          moneda?: string
           nombre?: string
           precio?: number
           stock_actual?: number

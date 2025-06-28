@@ -22,8 +22,9 @@ export interface Deuda {
   fecha_vencimiento: string;
   fecha_creacion: string;
   recargos: number;
-  estado: string; // Cambio a string genérico para compatibilidad con Supabase
+  estado: string;
   notas: string | null;
+  moneda: string;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +33,20 @@ export interface Pago {
   id: string;
   deuda_id: string;
   monto: number;
+  fecha_pago: string;
+  metodo_pago: string | null;
+  notas: string | null;
+  moneda: string;
+  created_at: string;
+}
+
+export interface HistorialPago {
+  id: string;
+  deuda_id: string | null;
+  cliente_nombre: string;
+  concepto: string;
+  monto_pago: number;
+  moneda: string;
   fecha_pago: string;
   metodo_pago: string | null;
   notas: string | null;
@@ -67,6 +82,7 @@ export interface Producto {
   categoria_id: string | null;
   codigo: string | null;
   activo: boolean;
+  moneda: string;
   created_at: string;
   updated_at: string;
 }
@@ -89,3 +105,11 @@ export interface DeudaConCliente extends Deuda {
 export interface ProductoConCategoria extends Producto {
   categoria?: Categoria;
 }
+
+// Constantes para monedas
+export const MONEDAS = {
+  ARS: { codigo: 'ARS', simbolo: '$', nombre: 'Peso Argentino' },
+  USD: { codigo: 'USD', simbolo: 'US$', nombre: 'Dólar Estadounidense' },
+} as const;
+
+export type MonedaCodigo = keyof typeof MONEDAS;
