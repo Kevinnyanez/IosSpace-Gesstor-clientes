@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Cliente } from "@/types";
+import { MONEDAS, type MonedaCodigo } from "@/types";
 
 const deudaFormSchema = z.object({
   cliente_id: z.string().min(1, "Debe seleccionar un cliente"),
@@ -49,6 +51,7 @@ const deudaFormSchema = z.object({
     required_error: "La fecha de vencimiento es obligatoria",
   }),
   cuotas: z.number().min(1, "Debe ser al menos 1 cuota").default(1),
+  moneda: z.enum(['ARS', 'USD'] as const).default('ARS'),
   notas: z.string().optional(),
 });
 
@@ -72,6 +75,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
       monto_total: 0,
       monto_abonado: 0,
       cuotas: 1,
+      moneda: "ARS",
       notas: "",
     },
   });
@@ -117,6 +121,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
       console.log('Monto abonado:', data.monto_abonado);
       console.log('Monto restante:', montoRestante);
       console.log('Cuotas:', data.cuotas);
+      console.log('Moneda:', data.moneda);
 
       // Si el monto restante es 0 o negativo, crear una sola deuda pagada
       if (montoRestante <= 0) {
@@ -127,6 +132,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
           monto_abonado: data.monto_total,
           fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
           estado: 'pagado',
+          moneda: data.moneda,
           notas: data.notas || null,
         };
 
@@ -164,8 +170,9 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               monto_abonado: 0,
               fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
               estado: 'pendiente',
+              moneda: data.moneda,
               notas: i === 0 && data.monto_abonado > 0 
-                ? `${data.notas || ''} | Abono inicial: $${data.monto_abonado}`.trim() 
+                ? `${data.notas || ''} | Abono inicial: ${MONEDAS[data.moneda].simbolo}${data.monto_abonado}`.trim() 
                 : data.notas || null,
             };
             
@@ -185,7 +192,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
 
           toast({
             title: "Deuda creada",
-            description: `Se han creado ${data.cuotas} cuotas de $${montoPorCuota.toLocaleString()} cada una`,
+            description: `Se han creado ${data.cuotas} cuotas de ${MONEDAS[data.moneda].simbolo}${montoPorCuota.toLocaleString()} cada una`,
           });
         } else {
           // Una sola deuda
@@ -196,6 +203,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
             monto_abonado: data.monto_abonado,
             fecha_vencimiento: data.fecha_vencimiento.toISOString().split('T')[0],
             estado: 'pendiente',
+            moneda: data.moneda,
             notas: data.notas || null,
           };
 
@@ -285,7 +293,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               )}
             />
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="monto_total"
@@ -321,6 +329,31 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="moneda"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Moneda *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(MONEDAS).map(([codigo, moneda]) => (
+                          <SelectItem key={codigo} value={codigo}>
+                            {moneda.simbolo} {moneda.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

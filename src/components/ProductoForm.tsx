@@ -10,6 +10,7 @@ import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Producto, Categoria } from "@/types";
+import { MONEDAS, type MonedaCodigo } from "@/types";
 
 interface ProductoFormProps {
   producto?: Producto;
@@ -28,6 +29,7 @@ export function ProductoForm({ producto, onClose, onSuccess }: ProductoFormProps
     stock_minimo: producto?.stock_minimo || 0,
     categoria_id: producto?.categoria_id || null,
     codigo: producto?.codigo || '',
+    moneda: (producto?.moneda as MonedaCodigo) || 'ARS' as MonedaCodigo,
     activo: producto?.activo ?? true
   });
   const { toast } = useToast();
@@ -81,6 +83,7 @@ export function ProductoForm({ producto, onClose, onSuccess }: ProductoFormProps
         stock_minimo: Number(formData.stock_minimo),
         categoria_id: formData.categoria_id || null,
         codigo: formData.codigo.trim() || null,
+        moneda: formData.moneda,
         activo: formData.activo
       };
 
@@ -172,7 +175,7 @@ export function ProductoForm({ producto, onClose, onSuccess }: ProductoFormProps
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="precio">Precio *</Label>
                 <Input
@@ -185,6 +188,25 @@ export function ProductoForm({ producto, onClose, onSuccess }: ProductoFormProps
                   placeholder="0.00"
                   required
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="moneda">Moneda *</Label>
+                <Select 
+                  value={formData.moneda} 
+                  onValueChange={(value: MonedaCodigo) => setFormData({ ...formData, moneda: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(MONEDAS).map(([codigo, moneda]) => (
+                      <SelectItem key={codigo} value={codigo}>
+                        {moneda.simbolo} {moneda.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div>
