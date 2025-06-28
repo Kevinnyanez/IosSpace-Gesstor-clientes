@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -88,6 +89,22 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
         .insert(pagos);
 
       if (pagoError) throw pagoError;
+
+      // Registrar todos los pagos en el historial
+      const historialEntries = deudas.map(deuda => ({
+        deuda_id: deuda.id,
+        cliente_nombre: `${deuda.cliente.nombre} ${deuda.cliente.apellido}`,
+        concepto: deuda.concepto,
+        monto_pago: deuda.monto_restante,
+        moneda: deuda.moneda,
+        fecha_pago: data.fecha_pago.toISOString().split('T')[0],
+      }));
+
+      const { error: historialError } = await supabase
+        .from('historial_pagos')
+        .insert(historialEntries);
+
+      if (historialError) throw historialError;
 
       // Actualizar todas las deudas como pagadas
       for (const deuda of deudas) {

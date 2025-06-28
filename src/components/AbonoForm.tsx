@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -81,6 +82,20 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
         });
 
       if (pagoError) throw pagoError;
+
+      // Registrar en historial de pagos
+      const { error: historialError } = await supabase
+        .from('historial_pagos')
+        .insert({
+          deuda_id: deuda.id,
+          cliente_nombre: `${deuda.cliente.nombre} ${deuda.cliente.apellido}`,
+          concepto: deuda.concepto,
+          monto_pago: data.monto,
+          moneda: deuda.moneda,
+          fecha_pago: data.fecha_pago.toISOString().split('T')[0],
+        });
+
+      if (historialError) throw historialError;
 
       // Actualizar la deuda
       const nuevoMontoAbonado = deuda.monto_abonado + data.monto;
