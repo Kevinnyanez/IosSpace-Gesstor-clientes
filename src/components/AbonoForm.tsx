@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { DeudaConCliente } from "@/types";
+import { MONEDAS } from "@/types";
 
 const abonoFormSchema = z.object({
   monto: z.number().min(0.01, "El monto debe ser mayor a 0"),
