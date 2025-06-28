@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Save, Percent, Calendar, DollarSign } from "lucide-react";
+import { Settings, Save, Percent, Calendar, DollarSign, AlertTriangle } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ export function ConfiguracionPage() {
   const [config, setConfig] = useState<Configuracion | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aplicandoRecargos, setAplicandoRecargos] = useState(false);
   const [formData, setFormData] = useState({
     porcentaje_recargo: 10,
     dias_para_recargo: 30,
@@ -96,22 +97,29 @@ export function ConfiguracionPage() {
   };
 
   const aplicarRecargos = async () => {
+    setAplicandoRecargos(true);
     try {
+      console.log('Aplicando recargos desde configuración...');
       const { error } = await supabase.rpc('aplicar_recargos_vencidos');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error en RPC aplicar_recargos_vencidos:', error);
+        throw error;
+      }
       
       toast({
         title: "Recargos aplicados",
-        description: "Se han aplicado los recargos a las deudas vencidas",
+        description: "Se han aplicado los recargos a las deudas vencidas según la configuración actual",
       });
     } catch (error) {
       console.error('Error aplicando recargos:', error);
       toast({
         title: "Error",
-        description: "No se pudieron aplicar los recargos",
+        description: "No se pudieron aplicar los recargos. Verifique que existan deudas vencidas sin recargo.",
         variant: "destructive",
       });
+    } finally {
+      setAplicandoRecargos(false);
     }
   };
 
@@ -173,16 +181,16 @@ export function ConfiguracionPage() {
                 <Input
                   id="dias_para_recargo"
                   type="number"
-                  min="1"
+                  min="0"
                   value={formData.dias_para_recargo}
                   onChange={(e) => setFormData({
                     ...formData,
-                    dias_para_recargo: parseInt(e.target.value) || 30
+                    dias_para_recargo: parseInt(e.target.value) || 0
                   })}
                   placeholder="30"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  Cantidad de días después del vencimiento para aplicar recargo
+                  Cantidad de días después del vencimiento para aplicar recargo (0 = inmediato)
                 </p>
               </div>
 
@@ -216,26 +224,35 @@ export function ConfiguracionPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Acciones del Sistema</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Acciones del Sistema
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-2">Aplicar Recargos</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Aplica recargos automáticamente a las deudas que han superado el período de gracia.
+            <div className="p-4 border rounded-lg border-orange-200 bg-orange-50">
+              <h3 className="font-semibold mb-2 text-orange-900">Aplicar Recargos</h3>
+              <p className="text-sm text-orange-800 mb-3">
+                Aplica recargos automáticamente a las deudas que han superado el período de gracia según la configuración actual.
               </p>
-              <Button onClick={aplicarRecargos} variant="outline" className="w-full">
-                Aplicar Recargos Vencidos
+              <Button 
+                onClick={aplicarRecargos} 
+                disabled={aplicandoRecargos}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                {aplicandoRecargos ? 'Aplicando Recargos...' : 'Aplicar Recargos Vencidos'}
               </Button>
             </div>
 
-            <div className="p-4 border rounded-lg bg-blue-50">
+            <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
               <h3 className="font-semibold mb-2 text-blue-900">Información</h3>
               <div className="text-sm text-blue-800 space-y-1">
                 <p>• Los recargos se calculan sobre el monto restante de la deuda</p>
                 <p>• Solo se aplican a deudas en estado "pendiente"</p>
                 <p>• Una vez aplicado, el estado cambia a "vencido"</p>
                 <p>• No se aplican recargos múltiples a la misma deuda</p>
+                <p>• Las deudas deben estar vencidas según los días configurados</p>
               </div>
             </div>
 

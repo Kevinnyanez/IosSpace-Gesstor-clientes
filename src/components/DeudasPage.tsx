@@ -52,6 +52,7 @@ export function DeudasPage() {
 
   const aplicarRecargosAutomaticosAlCargar = async () => {
     try {
+      console.log('Aplicando recargos automáticos al cargar...');
       await supabase.rpc('aplicar_recargos_vencidos');
       console.log('Recargos automáticos aplicados al cargar la página');
     } catch (error) {
