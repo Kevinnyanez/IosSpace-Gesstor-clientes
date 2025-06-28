@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DeudaForm } from "./DeudaForm";
 import { AbonoForm } from "./AbonoForm";
 import { PagoCompletoForm } from "./PagoCompletoForm";
+import { AplicarRecargosForm } from "./AplicarRecargosForm";
 import { HistorialPagos } from "./HistorialPagos";
 import { MONEDAS, type DeudaConCliente } from "@/types";
 
@@ -45,7 +46,18 @@ export function DeudasPage() {
 
   useEffect(() => {
     fetchDeudas();
+    // Aplicar recargos automáticamente al cargar la página
+    aplicarRecargosAutomaticosAlCargar();
   }, []);
+
+  const aplicarRecargosAutomaticosAlCargar = async () => {
+    try {
+      await supabase.rpc('aplicar_recargos_vencidos');
+      console.log('Recargos automáticos aplicados al cargar la página');
+    } catch (error) {
+      console.error('Error aplicando recargos automáticos:', error);
+    }
+  };
 
   const fetchDeudas = async () => {
     try {
@@ -242,7 +254,10 @@ export function DeudasPage() {
             <p className="text-gray-600 mt-2">Controla los pagos y saldos pendientes</p>
           </div>
         </div>
-        <DeudaForm onDeudaCreated={fetchDeudas} />
+        <div className="flex items-center gap-2">
+          <AplicarRecargosForm deudas={deudas} onRecargosAplicados={fetchDeudas} />
+          <DeudaForm onDeudaCreated={fetchDeudas} />
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -436,6 +451,11 @@ export function DeudasPage() {
                                   <div>
                                     <p className="font-medium text-gray-900">
                                       ${deuda.monto_total.toLocaleString()}
+                                      {deuda.recargos > 0 && (
+                                        <span className="text-orange-600 ml-2">
+                                          (+${deuda.recargos.toLocaleString()} recargo)
+                                        </span>
+                                      )}
                                     </p>
                                     <div className="flex items-center gap-2 text-sm text-gray-500">
                                       <Calendar className="h-4 w-4" />
