@@ -1,4 +1,3 @@
-
 export interface Cliente {
   id: string;
   nombre: string;
@@ -25,6 +24,7 @@ export interface Deuda {
   estado: string;
   notas: string | null;
   moneda: string;
+  fecha_ultimo_recargo: string | null;
   created_at: string;
   updated_at: string;
 }

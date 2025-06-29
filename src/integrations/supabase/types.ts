@@ -109,6 +109,7 @@ export type Database = {
           created_at: string
           estado: string
           fecha_creacion: string
+          fecha_ultimo_recargo: string | null
           fecha_vencimiento: string
           id: string
           moneda: string
@@ -125,6 +126,7 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha_creacion?: string
+          fecha_ultimo_recargo?: string | null
           fecha_vencimiento: string
           id?: string
           moneda?: string
@@ -141,6 +143,7 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha_creacion?: string
+          fecha_ultimo_recargo?: string | null
           fecha_vencimiento?: string
           id?: string
           moneda?: string
