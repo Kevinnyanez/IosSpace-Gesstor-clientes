@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +39,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const deudasVencidas = deudas.filter(deuda => {
     const fechaVencimiento = new Date(deuda.fecha_vencimiento);
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    hoy.setHours(23, 59, 59, 999); // Incluir todo el día de hoy
     fechaVencimiento.setHours(0, 0, 0, 0);
     
     // Verificar si ya tiene recargo reciente (menos de 30 días)
@@ -48,9 +47,19 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     // Permitir recargo desde el mismo día de vencimiento
+    const estaVencida = fechaVencimiento <= hoy;
+    
+    console.log(`Deuda ${deuda.id}:`, {
+      fechaVencimiento: fechaVencimiento.toISOString(),
+      hoy: hoy.toISOString(),
+      estaVencida,
+      tieneRecargoReciente,
+      puedeRecargo: deuda.estado === 'pendiente' && deuda.monto_restante > 0 && estaVencida && !tieneRecargoReciente
+    });
+    
     return deuda.estado === 'pendiente' && 
            deuda.monto_restante > 0 && 
-           fechaVencimiento <= hoy &&
+           estaVencida &&
            !tieneRecargoReciente;
   });
 

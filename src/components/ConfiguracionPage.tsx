@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -118,7 +117,7 @@ export function ConfiguracionPage() {
 
       // Filtrar las que están vencidas y no tienen recargo reciente
       const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+      hoy.setHours(23, 59, 59, 999); // Incluir todo el día de hoy
       
       const deudasParaRecargo = deudasVencidas?.filter(deuda => {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
@@ -128,7 +127,16 @@ export function ConfiguracionPage() {
         const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
           new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         
-        return fechaVencimiento <= hoy && !tieneRecargoReciente;
+        const estaVencida = fechaVencimiento <= hoy;
+        
+        console.log(`Deuda ${deuda.id}:`, {
+          fechaVencimiento: fechaVencimiento.toISOString(),
+          hoy: hoy.toISOString(),
+          estaVencida,
+          tieneRecargoReciente
+        });
+        
+        return estaVencida && !tieneRecargoReciente;
       }) || [];
 
       console.log('Deudas encontradas para recargo:', deudasParaRecargo.length);

@@ -66,10 +66,9 @@ export function DeudasPage() {
         return;
       }
 
-      // Filtrar las que están vencidas desde ayer y no tienen recargo reciente
-      const ayer = new Date();
-      ayer.setDate(ayer.getDate() - 1);
-      ayer.setHours(0, 0, 0, 0);
+      // Filtrar las que están vencidas desde hoy y no tienen recargo reciente
+      const hoy = new Date();
+      hoy.setHours(23, 59, 59, 999); // Incluir todo el día de hoy
       
       const deudasParaRecargo = deudasVencidas?.filter(deuda => {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
@@ -79,7 +78,9 @@ export function DeudasPage() {
         const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
           new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         
-        return fechaVencimiento <= ayer && !tieneRecargoReciente;
+        const estaVencida = fechaVencimiento <= hoy;
+        
+        return estaVencida && !tieneRecargoReciente;
       }) || [];
 
       if (deudasParaRecargo.length === 0) {
