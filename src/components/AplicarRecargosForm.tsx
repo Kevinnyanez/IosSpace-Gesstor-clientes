@@ -40,7 +40,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const deudasVencidas = deudas.filter(deuda => {
     const fechaVencimiento = new Date(deuda.fecha_vencimiento);
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0); // Resetear horas para comparación de fechas
+    hoy.setHours(0, 0, 0, 0);
     fechaVencimiento.setHours(0, 0, 0, 0);
     
     return deuda.estado === 'pendiente' && 
@@ -55,16 +55,59 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const aplicarRecargosAutomaticos = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.rpc('aplicar_recargos_vencidos');
+      console.log('Aplicando recargos automáticos a', deudasVencidas.length, 'deudas');
       
-      if (error) {
-        console.error('Error en RPC:', error);
-        throw error;
+      // Obtener configuración
+      const { data: config, error: configError } = await supabase
+        .from('configuracion')
+        .select('porcentaje_recargo')
+        .limit(1)
+        .single();
+
+      if (configError) {
+        console.error('Error obteniendo configuración:', configError);
+        throw new Error('No se pudo obtener la configuración de recargos');
+      }
+
+      const porcentajeRecargo = config?.porcentaje_recargo || 10;
+      console.log('Porcentaje de recargo:', porcentajeRecargo);
+
+      // Aplicar recargos individualmente para tener control
+      let recargosAplicados = 0;
+      for (const deuda of deudasVencidas) {
+        const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
+        const nuevoMontoTotal = deuda.monto_total + montoRecargo;
+        const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
+        
+        console.log(`Aplicando recargo a deuda ${deuda.id}:`, {
+          montoOriginal: deuda.monto_total,
+          montoRestante: deuda.monto_restante,
+          recargo: montoRecargo,
+          nuevoTotal: nuevoMontoTotal,
+          nuevoRestante: nuevoMontoRestante
+        });
+
+        const { error } = await supabase
+          .from('deudas')
+          .update({
+            recargos: montoRecargo,
+            monto_total: nuevoMontoTotal,
+            monto_restante: nuevoMontoRestante,
+            estado: 'vencido'
+          })
+          .eq('id', deuda.id);
+
+        if (error) {
+          console.error('Error actualizando deuda:', error);
+          throw error;
+        }
+        
+        recargosAplicados++;
       }
       
       toast({
         title: "Recargos aplicados",
-        description: "Se han aplicado recargos automáticos a las deudas vencidas",
+        description: `Se aplicaron recargos a ${recargosAplicados} deudas vencidas`,
       });
 
       setOpen(false);
@@ -73,7 +116,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       console.error('Error aplicando recargos:', error);
       toast({
         title: "Error",
-        description: "No se pudieron aplicar los recargos automáticos",
+        description: error.message || "No se pudieron aplicar los recargos automáticos",
         variant: "destructive",
       });
     } finally {
@@ -81,12 +124,25 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
     }
   };
 
-  const aplicarRecargoManual = async (deudaId: string, montoRecargo: number) => {
+  const aplicarRecargoManual = async (deudaId: string, montoRecargo: number, deuda: DeudaConCliente) => {
     try {
+      const nuevoMontoTotal = deuda.monto_total + montoRecargo;
+      const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
+
+      console.log(`Aplicando recargo manual a deuda ${deudaId}:`, {
+        montoOriginal: deuda.monto_total,
+        montoRestante: deuda.monto_restante,
+        recargo: montoRecargo,
+        nuevoTotal: nuevoMontoTotal,
+        nuevoRestante: nuevoMontoRestante
+      });
+
       const { error } = await supabase
         .from('deudas')
         .update({
           recargos: montoRecargo,
+          monto_total: nuevoMontoTotal,
+          monto_restante: nuevoMontoRestante,
           estado: 'vencido'
         })
         .eq('id', deudaId);
@@ -160,7 +216,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
                   <AlertDialogTitle>¿Aplicar recargos automáticos?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Esta acción aplicará recargos automáticamente a {deudasVencidas.length} deudas vencidas 
-                    según la configuración del sistema. Esta acción no se puede deshacer.
+                    según la configuración del sistema. Los montos totales y restantes se actualizarán. Esta acción no se puede deshacer.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -220,13 +276,13 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
                           <AlertDialogTitle>¿Aplicar recargo individual?</AlertDialogTitle>
                           <AlertDialogDescription>
                             Se aplicará un recargo de {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoRecargo.toLocaleString()} 
-                            a la deuda de {deuda.cliente.nombre} {deuda.cliente.apellido}. Esta acción no se puede deshacer.
+                            a la deuda de {deuda.cliente.nombre} {deuda.cliente.apellido}. El monto total y restante se actualizarán. Esta acción no se puede deshacer.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
                           <AlertDialogAction 
-                            onClick={() => aplicarRecargoManual(deuda.id, montoRecargo)}
+                            onClick={() => aplicarRecargoManual(deuda.id, montoRecargo, deuda)}
                             className="bg-orange-600 hover:bg-orange-700"
                           >
                             Aplicar Recargo

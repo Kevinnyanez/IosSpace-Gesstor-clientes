@@ -100,16 +100,68 @@ export function ConfiguracionPage() {
     setAplicandoRecargos(true);
     try {
       console.log('Aplicando recargos desde configuración...');
-      const { error } = await supabase.rpc('aplicar_recargos_vencidos');
       
-      if (error) {
-        console.error('Error en RPC aplicar_recargos_vencidos:', error);
-        throw error;
+      // Obtener deudas vencidas sin recargo
+      const { data: deudasVencidas, error: deudasError } = await supabase
+        .from('deudas')
+        .select(`
+          *,
+          cliente:clientes(*)
+        `)
+        .eq('estado', 'pendiente')
+        .eq('recargos', 0)
+        .gt('monto_restante', 0);
+
+      if (deudasError) {
+        console.error('Error obteniendo deudas:', deudasError);
+        throw deudasError;
+      }
+
+      // Filtrar las que están realmente vencidas
+      const hoy = new Date();
+      const deudasParaRecargo = deudasVencidas?.filter(deuda => {
+        const fechaVencimiento = new Date(deuda.fecha_vencimiento);
+        return fechaVencimiento < hoy;
+      }) || [];
+
+      console.log('Deudas encontradas para recargo:', deudasParaRecargo.length);
+
+      if (deudasParaRecargo.length === 0) {
+        toast({
+          title: "Sin deudas para recargo",
+          description: "No se encontraron deudas vencidas sin recargo aplicado",
+        });
+        return;
+      }
+
+      // Aplicar recargos individualmente
+      let recargosAplicados = 0;
+      for (const deuda of deudasParaRecargo) {
+        const montoRecargo = Math.round((deuda.monto_restante * formData.porcentaje_recargo) / 100);
+        const nuevoMontoTotal = deuda.monto_total + montoRecargo;
+        const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
+
+        const { error } = await supabase
+          .from('deudas')
+          .update({
+            recargos: montoRecargo,
+            monto_total: nuevoMontoTotal,
+            monto_restante: nuevoMontoRestante,
+            estado: 'vencido'
+          })
+          .eq('id', deuda.id);
+
+        if (error) {
+          console.error('Error actualizando deuda:', error);
+          throw error;
+        }
+        
+        recargosAplicados++;
       }
       
       toast({
         title: "Recargos aplicados",
-        description: "Se han aplicado los recargos a las deudas vencidas según la configuración actual",
+        description: `Se aplicaron recargos a ${recargosAplicados} deudas vencidas según la configuración actual`,
       });
     } catch (error) {
       console.error('Error aplicando recargos:', error);

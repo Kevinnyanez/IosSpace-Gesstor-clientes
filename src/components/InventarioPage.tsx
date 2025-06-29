@@ -4,8 +4,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Plus, AlertTriangle, Edit, Trash2, Tag } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Search, 
+  Plus, 
+  Package, 
+  AlertTriangle, 
+  Edit, 
+  Trash2,
+  Filter,
+  DollarSign
+} from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,17 +38,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ProductoForm } from "./ProductoForm";
 import { CategoriaForm } from "./CategoriaForm";
-import type { ProductoConCategoria, Categoria } from "@/types";
+import { InventarioStats } from "./InventarioStats";
+import { MONEDAS, type ProductoConCategoria, type Categoria } from "@/types";
 
 export function InventarioPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [productos, setProductos] = useState<ProductoConCategoria[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [editingProducto, setEditingProducto] = useState<ProductoConCategoria | null>(null);
-  const [showProductForm, setShowProductForm] = useState(false);
-  const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null);
-  const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('productos');
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('todos');
+  const [filtroMoneda, setFiltroMoneda] = useState<string>('todos');
+  const [filtroStock, setFiltroStock] = useState<string>('todos');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,7 +65,8 @@ export function InventarioPage() {
           *,
           categoria:categorias(*)
         `)
-        .order('created_at', { ascending: false });
+        .eq('activo', true)
+        .order('nombre');
 
       if (error) throw error;
       setProductos(data || []);
@@ -82,14 +101,14 @@ export function InventarioPage() {
     try {
       const { error } = await supabase
         .from('productos')
-        .delete()
+        .update({ activo: false })
         .eq('id', productoId);
 
       if (error) throw error;
 
       toast({
         title: "Producto eliminado",
-        description: "El producto se eliminó correctamente",
+        description: "El producto se desactivó correctamente",
       });
 
       fetchProductos();
@@ -103,16 +122,34 @@ export function InventarioPage() {
     }
   };
 
-  const filteredProductos = productos.filter(producto =>
-    producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    producto.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    producto.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    producto.categoria?.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getStockStatus = (producto: ProductoConCategoria) => {
+    if (producto.stock_actual === 0) {
+      return { label: 'Sin Stock', variant: 'destructive' as const, color: 'text-red-700 bg-red-100' };
+    } else if (producto.stock_actual <= producto.stock_minimo) {
+      return { label: 'Stock Bajo', variant: 'default' as const, color: 'text-orange-700 bg-orange-100' };
+    }
+    return { label: 'Disponible', variant: 'default' as const, color: 'text-green-700 bg-green-100' };
+  };
 
-  const productosActivos = productos.filter(p => p.activo).length;
-  const productosStockBajo = productos.filter(p => p.stock_actual <= p.stock_minimo).length;
-  const valorInventario = productos.reduce((sum, p) => sum + (p.precio * p.stock_actual), 0);
+  // Filtrar productos
+  const filteredProductos = productos.filter(producto => {
+    const matchesSearch = producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         producto.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         producto.codigo?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCategoria = filtroCategoria === 'todos' || 
+                            producto.categoria_id === filtroCategoria ||
+                            (filtroCategoria === 'sin-categoria' && !producto.categoria_id);
+
+    const matchesMoneda = filtroMoneda === 'todos' || producto.moneda === filtroMoneda;
+
+    const matchesStock = filtroStock === 'todos' ||
+                        (filtroStock === 'disponible' && producto.stock_actual > producto.stock_minimo) ||
+                        (filtroStock === 'bajo' && producto.stock_actual <= producto.stock_minimo && producto.stock_actual > 0) ||
+                        (filtroStock === 'agotado' && producto.stock_actual === 0);
+
+    return matchesSearch && matchesCategoria && matchesMoneda && matchesStock;
+  });
 
   if (loading) {
     return (
@@ -128,235 +165,199 @@ export function InventarioPage() {
         <div className="flex items-center gap-4">
           <SidebarTrigger />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
-            <p className="text-gray-600 mt-2">Controla tu inventario y productos</p>
+            <h1 className="text-3xl font-bold text-gray-900">Inventario</h1>
+            <p className="text-gray-600 mt-2">Gestiona tus productos y categorías</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowCategoryForm(true)} variant="outline">
-            <Tag className="h-4 w-4 mr-2" />
-            Nueva Categoría
-          </Button>
-          <Button onClick={() => setShowProductForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </Button>
+        <div className="flex items-center gap-2">
+          <CategoriaForm onCategoriaCreated={fetchCategorias} />
+          <ProductoForm onProductoCreated={fetchProductos} categorias={categorias} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Productos</CardTitle>
-            <Package className="h-5 w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{productos.length}</div>
-            <p className="text-xs text-gray-600 mt-1">productos registrados</p>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="productos">Productos</TabsTrigger>
+          <TabsTrigger value="estadisticas">Estadísticas</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Activos</CardTitle>
-            <Package className="h-5 w-5 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{productosActivos}</div>
-            <p className="text-xs text-gray-600 mt-1">productos activos</p>
-          </CardContent>
-        </Card>
+        <TabsContent value="estadisticas">
+          <InventarioStats productos={productos} />
+        </TabsContent>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Stock Bajo</CardTitle>
-            <AlertTriangle className="h-5 w-5 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{productosStockBajo}</div>
-            <p className="text-xs text-gray-600 mt-1">requieren atención</p>
-          </CardContent>
-        </Card>
+        <TabsContent value="productos" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Productos ({filteredProductos.length})</CardTitle>
+                <div className="flex items-center gap-4">
+                  {/* Filtros */}
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todas</SelectItem>
+                        <SelectItem value="sin-categoria">Sin Categoría</SelectItem>
+                        {categorias.map((categoria) => (
+                          <SelectItem key={categoria.id} value={categoria.id}>
+                            {categoria.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Valor Inventario</CardTitle>
-            <Package className="h-5 w-5 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              ${valorInventario.toLocaleString()}
-            </div>
-            <p className="text-xs text-gray-600 mt-1">valor total</p>
-          </CardContent>
-        </Card>
-      </div>
+                    <Select value={filtroMoneda} onValueChange={setFiltroMoneda}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Moneda" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {Object.entries(MONEDAS).map(([codigo, moneda]) => (
+                          <SelectItem key={codigo} value={codigo}>
+                            {moneda.simbolo} {codigo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Lista de Productos ({filteredProductos.length})</CardTitle>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar productos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredProductos.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">
-                {searchTerm ? 'No se encontraron productos que coincidan con la búsqueda' : 'No hay productos registrados'}
-              </p>
-              {!searchTerm && (
-                <div className="mt-4">
-                  <Button onClick={() => setShowProductForm(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Primer Producto
-                  </Button>
+                    <Select value={filtroStock} onValueChange={setFiltroStock}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Stock" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="disponible">Disponible</SelectItem>
+                        <SelectItem value="bajo">Stock Bajo</SelectItem>
+                        <SelectItem value="agotado">Agotado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Búsqueda */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Buscar productos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredProductos.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No hay productos que coincidan con los filtros</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredProductos.map((producto) => {
+                    const stockStatus = getStockStatus(producto);
+                    const valorTotal = producto.precio * producto.stock_actual;
+
+                    return (
+                      <Card key={producto.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900 mb-1">
+                                {producto.nombre}
+                              </h3>
+                              {producto.codigo && (
+                                <p className="text-sm text-gray-500 mb-1">
+                                  Código: {producto.codigo}
+                                </p>
+                              )}
+                              {producto.categoria && (
+                                <Badge variant="outline" className="text-xs mb-2">
+                                  {producto.categoria.nombre}
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge 
+                              className={stockStatus.color}
+                              variant="outline"
+                            >
+                              {stockStatus.label}
+                            </Badge>
+                          </div>
+
+                          {producto.descripcion && (
+                            <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                              {producto.descripcion}
+                            </p>
+                          )}
+
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Precio:</span>
+                              <span className="font-semibold">
+                                {MONEDAS[producto.moneda as keyof typeof MONEDAS]?.simbolo || '$'}
+                                {producto.precio.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Stock:</span>
+                              <span className={producto.stock_actual <= producto.stock_minimo ? 'text-orange-600 font-semibold' : ''}>
+                                {producto.stock_actual} / {producto.stock_minimo} mín.
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Valor Total:</span>
+                              <span className="font-semibold text-green-600">
+                                {MONEDAS[producto.moneda as keyof typeof MONEDAS]?.simbolo || '$'}
+                                {valorTotal.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="flex-1">
+                              <Edit className="h-4 w-4 mr-1" />
+                              Editar
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción desactivará el producto "{producto.nombre}". 
+                                    No se eliminará permanentemente pero no será visible en el inventario.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteProducto(producto.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProductos.map((producto) => (
-                <Card key={producto.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">{producto.nombre}</h3>
-                        {producto.codigo && (
-                          <p className="text-sm text-gray-500">Código: {producto.codigo}</p>
-                        )}
-                        {producto.categoria && (
-                          <Badge variant="outline" className="mt-1">
-                            {producto.categoria.nombre}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingProducto(producto)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción eliminará permanentemente el producto. Esta acción no se puede deshacer.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => handleDeleteProducto(producto.id)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Eliminar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {producto.descripcion && (
-                      <p className="text-sm text-gray-600">{producto.descripcion}</p>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-green-600">
-                        ${producto.precio.toLocaleString()}
-                      </span>
-                      <Badge variant={producto.activo ? "default" : "secondary"}>
-                        {producto.activo ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-gray-500">Stock:</span>
-                        <span className={`ml-1 font-semibold ${
-                          producto.stock_actual <= producto.stock_minimo ? 'text-red-600' : 'text-gray-900'
-                        }`}>
-                          {producto.stock_actual}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Mínimo:</span>
-                        <span className="ml-1 font-semibold text-gray-900">
-                          {producto.stock_minimo}
-                        </span>
-                      </div>
-                    </div>
-                    {producto.stock_actual <= producto.stock_minimo && (
-                      <div className="flex items-center gap-1 text-orange-600 text-sm">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>Stock bajo</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {showProductForm && (
-        <ProductoForm
-          onClose={() => setShowProductForm(false)}
-          onSuccess={() => {
-            fetchProductos();
-            setShowProductForm(false);
-          }}
-        />
-      )}
-
-      {editingProducto && (
-        <ProductoForm
-          producto={editingProducto}
-          onClose={() => setEditingProducto(null)}
-          onSuccess={() => {
-            fetchProductos();
-            setEditingProducto(null);
-          }}
-        />
-      )}
-
-      {showCategoryForm && (
-        <CategoriaForm
-          onClose={() => setShowCategoryForm(false)}
-          onSuccess={() => {
-            fetchCategorias();
-            setShowCategoryForm(false);
-          }}
-        />
-      )}
-
-      {editingCategoria && (
-        <CategoriaForm
-          categoria={editingCategoria}
-          onClose={() => setEditingCategoria(null)}
-          onSuccess={() => {
-            fetchCategorias();
-            setEditingCategoria(null);
-          }}
-        />
-      )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
