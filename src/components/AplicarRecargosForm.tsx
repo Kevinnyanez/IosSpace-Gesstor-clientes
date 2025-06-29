@@ -36,18 +36,22 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Filtrar deudas que pueden recibir recargo (vencidas desde hoy y sin recargo aplicado)
+  // Filtrar deudas que pueden recibir recargo (vencidas desde hoy y sin recargo aplicado recientemente)
   const deudasVencidas = deudas.filter(deuda => {
     const fechaVencimiento = new Date(deuda.fecha_vencimiento);
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     fechaVencimiento.setHours(0, 0, 0, 0);
     
+    // Verificar si ya tiene recargo reciente (menos de 30 días)
+    const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
+      new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    
     // Permitir recargo desde el mismo día de vencimiento
     return deuda.estado === 'pendiente' && 
            deuda.monto_restante > 0 && 
-           deuda.recargos === 0 && 
-           fechaVencimiento <= hoy; // Cambio: <= en lugar de <
+           fechaVencimiento <= hoy &&
+           !tieneRecargoReciente;
   });
 
   console.log('Deudas vencidas encontradas:', deudasVencidas.length);
@@ -63,7 +67,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
         .from('configuracion')
         .select('porcentaje_recargo')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (configError) {
         console.error('Error obteniendo configuración:', configError);
@@ -73,7 +77,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       const porcentajeRecargo = config?.porcentaje_recargo || 10;
       console.log('Porcentaje de recargo:', porcentajeRecargo);
 
-      // Aplicar recargos individualmente para tener control
+      // Aplicar recargos individualmente
       let recargosAplicados = 0;
       for (const deuda of deudasVencidas) {
         const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
@@ -91,11 +95,11 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
         const { error } = await supabase
           .from('deudas')
           .update({
-            recargos: montoRecargo,
+            recargos: deuda.recargos + montoRecargo,
             monto_total: nuevoMontoTotal,
             monto_restante: nuevoMontoRestante,
             estado: 'vencido',
-            fecha_ultimo_recargo: new Date().toISOString() // Agregar fecha del último recargo
+            fecha_ultimo_recargo: new Date().toISOString()
           })
           .eq('id', deuda.id);
 
@@ -118,7 +122,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       console.error('Error aplicando recargos:', error);
       toast({
         title: "Error",
-        description: error.message || "No se pudieron aplicar los recargos automáticos",
+        description: error instanceof Error ? error.message : "No se pudieron aplicar los recargos automáticos",
         variant: "destructive",
       });
     } finally {
@@ -142,11 +146,11 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       const { error } = await supabase
         .from('deudas')
         .update({
-          recargos: montoRecargo,
+          recargos: deuda.recargos + montoRecargo,
           monto_total: nuevoMontoTotal,
           monto_restante: nuevoMontoRestante,
           estado: 'vencido',
-          fecha_ultimo_recargo: new Date().toISOString() // Agregar fecha del último recargo
+          fecha_ultimo_recargo: new Date().toISOString()
         })
         .eq('id', deudaId);
 
@@ -191,7 +195,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
             Aplicar Recargos a Deudas Vencidas
           </DialogTitle>
           <DialogDescription>
-            Se encontraron {deudasVencidas.length} deudas vencidas sin recargo aplicado
+            Se encontraron {deudasVencidas.length} deudas vencidas sin recargo aplicado recientemente
           </DialogDescription>
         </DialogHeader>
         
@@ -236,13 +240,15 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900">Deudas Vencidas Sin Recargo</h3>
+            <h3 className="font-semibold text-gray-900">Deudas Vencidas Sin Recargo Reciente</h3>
             <div className="max-h-96 overflow-y-auto space-y-2">
               {deudasVencidas.map((deuda) => {
                 const fechaVencimiento = new Date(deuda.fecha_vencimiento);
                 const hoy = new Date();
                 const diasVencido = Math.max(0, Math.ceil((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24)));
-                const porcentajeRecargo = 10; // Esto debería venir de la configuración
+                
+                // Obtener porcentaje de recargo por defecto
+                const porcentajeRecargo = 10; // Este valor se obtendría de la configuración
                 const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
 
                 return (

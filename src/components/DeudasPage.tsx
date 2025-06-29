@@ -54,12 +54,11 @@ export function DeudasPage() {
     try {
       console.log('Aplicando recargos automáticos al cargar...');
       
-      // Obtener deudas vencidas sin recargo
+      // Obtener deudas vencidas
       const { data: deudasVencidas, error: deudasError } = await supabase
         .from('deudas')
         .select('*')
         .eq('estado', 'pendiente')
-        .eq('recargos', 0)
         .gt('monto_restante', 0);
 
       if (deudasError) {
@@ -67,14 +66,20 @@ export function DeudasPage() {
         return;
       }
 
-      // Filtrar las que están vencidas (desde el mismo día)
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+      // Filtrar las que están vencidas desde ayer y no tienen recargo reciente
+      const ayer = new Date();
+      ayer.setDate(ayer.getDate() - 1);
+      ayer.setHours(0, 0, 0, 0);
       
       const deudasParaRecargo = deudasVencidas?.filter(deuda => {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
         fechaVencimiento.setHours(0, 0, 0, 0);
-        return fechaVencimiento <= hoy; // Cambio: <= en lugar de <
+        
+        // Verificar si ya tiene recargo reciente (menos de 30 días)
+        const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
+          new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        
+        return fechaVencimiento <= ayer && !tieneRecargoReciente;
       }) || [];
 
       if (deudasParaRecargo.length === 0) {
@@ -87,36 +92,26 @@ export function DeudasPage() {
         .from('configuracion')
         .select('porcentaje_recargo')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const porcentajeRecargo = config?.porcentaje_recargo || 10;
 
-      // Aplicar recargos automáticamente solo a deudas que vencieron ayer o antes
-      const ayer = new Date();
-      ayer.setDate(ayer.getDate() - 1);
-      ayer.setHours(0, 0, 0, 0);
-
+      // Aplicar recargos automáticamente
       for (const deuda of deudasParaRecargo) {
-        const fechaVencimiento = new Date(deuda.fecha_vencimiento);
-        fechaVencimiento.setHours(0, 0, 0, 0);
-        
-        // Solo aplicar automáticamente si venció ayer o antes
-        if (fechaVencimiento < hoy) {
-          const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
-          const nuevoMontoTotal = deuda.monto_total + montoRecargo;
-          const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
+        const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
+        const nuevoMontoTotal = deuda.monto_total + montoRecargo;
+        const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
 
-          await supabase
-            .from('deudas')
-            .update({
-              recargos: montoRecargo,
-              monto_total: nuevoMontoTotal,
-              monto_restante: nuevoMontoRestante,
-              estado: 'vencido',
-              fecha_ultimo_recargo: new Date().toISOString()
-            })
-            .eq('id', deuda.id);
-        }
+        await supabase
+          .from('deudas')
+          .update({
+            recargos: deuda.recargos + montoRecargo,
+            monto_total: nuevoMontoTotal,
+            monto_restante: nuevoMontoRestante,
+            estado: 'vencido',
+            fecha_ultimo_recargo: new Date().toISOString()
+          })
+          .eq('id', deuda.id);
       }
       
       console.log('Recargos automáticos aplicados al cargar la página');

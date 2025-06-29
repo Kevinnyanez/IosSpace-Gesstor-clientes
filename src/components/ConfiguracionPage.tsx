@@ -101,7 +101,7 @@ export function ConfiguracionPage() {
     try {
       console.log('Aplicando recargos desde configuración...');
       
-      // Obtener deudas vencidas sin recargo
+      // Obtener deudas vencidas sin recargo reciente
       const { data: deudasVencidas, error: deudasError } = await supabase
         .from('deudas')
         .select(`
@@ -109,7 +109,6 @@ export function ConfiguracionPage() {
           cliente:clientes(*)
         `)
         .eq('estado', 'pendiente')
-        .eq('recargos', 0)
         .gt('monto_restante', 0);
 
       if (deudasError) {
@@ -117,14 +116,19 @@ export function ConfiguracionPage() {
         throw deudasError;
       }
 
-      // Filtrar las que están vencidas (desde el mismo día de vencimiento)
+      // Filtrar las que están vencidas y no tienen recargo reciente
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       
       const deudasParaRecargo = deudasVencidas?.filter(deuda => {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
         fechaVencimiento.setHours(0, 0, 0, 0);
-        return fechaVencimiento <= hoy; // Cambio: <= en lugar de <
+        
+        // Verificar si ya tiene recargo reciente (menos de 30 días)
+        const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
+          new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        
+        return fechaVencimiento <= hoy && !tieneRecargoReciente;
       }) || [];
 
       console.log('Deudas encontradas para recargo:', deudasParaRecargo.length);
@@ -132,7 +136,7 @@ export function ConfiguracionPage() {
       if (deudasParaRecargo.length === 0) {
         toast({
           title: "Sin deudas para recargo",
-          description: "No se encontraron deudas vencidas sin recargo aplicado",
+          description: "No se encontraron deudas vencidas sin recargo aplicado recientemente",
         });
         return;
       }
@@ -147,7 +151,7 @@ export function ConfiguracionPage() {
         const { error } = await supabase
           .from('deudas')
           .update({
-            recargos: montoRecargo,
+            recargos: deuda.recargos + montoRecargo,
             monto_total: nuevoMontoTotal,
             monto_restante: nuevoMontoRestante,
             estado: 'vencido',
@@ -171,7 +175,7 @@ export function ConfiguracionPage() {
       console.error('Error aplicando recargos:', error);
       toast({
         title: "Error",
-        description: "No se pudieron aplicar los recargos. Verifique que existan deudas vencidas sin recargo.",
+        description: "No se pudieron aplicar los recargos. Verifique que existan deudas vencidas sin recargo reciente.",
         variant: "destructive",
       });
     } finally {
