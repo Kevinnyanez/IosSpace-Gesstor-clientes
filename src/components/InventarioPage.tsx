@@ -50,6 +50,8 @@ export function InventarioPage() {
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todos');
   const [filtroMoneda, setFiltroMoneda] = useState<string>('todos');
   const [filtroStock, setFiltroStock] = useState<string>('todos');
+  const [showCategoriaForm, setShowCategoriaForm] = useState(false);
+  const [showProductoForm, setShowProductoForm] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -170,8 +172,14 @@ export function InventarioPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <CategoriaForm onCategoriaCreated={fetchCategorias} />
-          <ProductoForm onProductoCreated={fetchProductos} categorias={categorias} />
+          <Button onClick={() => setShowCategoriaForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Categoría
+          </Button>
+          <Button onClick={() => setShowProductoForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Producto
+          </Button>
         </div>
       </div>
 
@@ -358,6 +366,27 @@ export function InventarioPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Modals */}
+      {showCategoriaForm && (
+        <CategoriaForm
+          onClose={() => setShowCategoriaForm(false)}
+          onSuccess={() => {
+            fetchCategorias();
+            setShowCategoriaForm(false);
+          }}
+        />
+      )}
+
+      {showProductoForm && (
+        <ProductoForm
+          onClose={() => setShowProductoForm(false)}
+          onSuccess={() => {
+            fetchProductos();
+            setShowProductoForm(false);
+          }}
+        />
+      )}
     </div>
   );
 }
