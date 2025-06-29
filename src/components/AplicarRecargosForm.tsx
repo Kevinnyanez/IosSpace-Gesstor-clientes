@@ -36,17 +36,18 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Filtrar deudas vencidas sin recargo aplicado
+  // Filtrar deudas que pueden recibir recargo (vencidas desde hoy y sin recargo aplicado)
   const deudasVencidas = deudas.filter(deuda => {
     const fechaVencimiento = new Date(deuda.fecha_vencimiento);
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     fechaVencimiento.setHours(0, 0, 0, 0);
     
+    // Permitir recargo desde el mismo día de vencimiento
     return deuda.estado === 'pendiente' && 
            deuda.monto_restante > 0 && 
            deuda.recargos === 0 && 
-           fechaVencimiento < hoy;
+           fechaVencimiento <= hoy; // Cambio: <= en lugar de <
   });
 
   console.log('Deudas vencidas encontradas:', deudasVencidas.length);
@@ -93,7 +94,8 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
             recargos: montoRecargo,
             monto_total: nuevoMontoTotal,
             monto_restante: nuevoMontoRestante,
-            estado: 'vencido'
+            estado: 'vencido',
+            fecha_ultimo_recargo: new Date().toISOString() // Agregar fecha del último recargo
           })
           .eq('id', deuda.id);
 
@@ -143,7 +145,8 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
           recargos: montoRecargo,
           monto_total: nuevoMontoTotal,
           monto_restante: nuevoMontoRestante,
-          estado: 'vencido'
+          estado: 'vencido',
+          fecha_ultimo_recargo: new Date().toISOString() // Agregar fecha del último recargo
         })
         .eq('id', deudaId);
 
@@ -238,7 +241,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
               {deudasVencidas.map((deuda) => {
                 const fechaVencimiento = new Date(deuda.fecha_vencimiento);
                 const hoy = new Date();
-                const diasVencido = Math.ceil((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24));
+                const diasVencido = Math.max(0, Math.ceil((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24)));
                 const porcentajeRecargo = 10; // Esto debería venir de la configuración
                 const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
 
@@ -249,9 +252,9 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
                         <h4 className="font-medium">
                           {deuda.cliente.nombre} {deuda.cliente.apellido}
                         </h4>
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge variant={diasVencido === 0 ? "default" : "destructive"} className="text-xs">
                           <Clock className="h-3 w-3 mr-1" />
-                          {diasVencido} días vencido
+                          {diasVencido === 0 ? 'Vence hoy' : `${diasVencido} días vencido`}
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-600">{deuda.concepto}</p>

@@ -117,11 +117,14 @@ export function ConfiguracionPage() {
         throw deudasError;
       }
 
-      // Filtrar las que están realmente vencidas
+      // Filtrar las que están vencidas (desde el mismo día de vencimiento)
       const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
       const deudasParaRecargo = deudasVencidas?.filter(deuda => {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
-        return fechaVencimiento < hoy;
+        fechaVencimiento.setHours(0, 0, 0, 0);
+        return fechaVencimiento <= hoy; // Cambio: <= en lugar de <
       }) || [];
 
       console.log('Deudas encontradas para recargo:', deudasParaRecargo.length);
@@ -147,7 +150,8 @@ export function ConfiguracionPage() {
             recargos: montoRecargo,
             monto_total: nuevoMontoTotal,
             monto_restante: nuevoMontoRestante,
-            estado: 'vencido'
+            estado: 'vencido',
+            fecha_ultimo_recargo: new Date().toISOString()
           })
           .eq('id', deuda.id);
 
