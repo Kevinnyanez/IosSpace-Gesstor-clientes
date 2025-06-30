@@ -91,22 +91,20 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       for (const deuda of deudasVencidas) {
         const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
         const nuevoMontoTotal = deuda.monto_total + montoRecargo;
-        const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
         
         console.log(`Aplicando recargo a deuda ${deuda.id}:`, {
           montoOriginal: deuda.monto_total,
           montoRestante: deuda.monto_restante,
           recargo: montoRecargo,
-          nuevoTotal: nuevoMontoTotal,
-          nuevoRestante: nuevoMontoRestante
+          nuevoTotal: nuevoMontoTotal
         });
 
+        // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
         const { error } = await supabase
           .from('deudas')
           .update({
             recargos: deuda.recargos + montoRecargo,
             monto_total: nuevoMontoTotal,
-            monto_restante: nuevoMontoRestante,
             estado: 'vencido',
             fecha_ultimo_recargo: new Date().toISOString()
           })
@@ -142,22 +140,20 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const aplicarRecargoManual = async (deudaId: string, montoRecargo: number, deuda: DeudaConCliente) => {
     try {
       const nuevoMontoTotal = deuda.monto_total + montoRecargo;
-      const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
 
       console.log(`Aplicando recargo manual a deuda ${deudaId}:`, {
         montoOriginal: deuda.monto_total,
         montoRestante: deuda.monto_restante,
         recargo: montoRecargo,
-        nuevoTotal: nuevoMontoTotal,
-        nuevoRestante: nuevoMontoRestante
+        nuevoTotal: nuevoMontoTotal
       });
 
+      // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
       const { error } = await supabase
         .from('deudas')
         .update({
           recargos: deuda.recargos + montoRecargo,
           monto_total: nuevoMontoTotal,
-          monto_restante: nuevoMontoRestante,
           estado: 'vencido',
           fecha_ultimo_recargo: new Date().toISOString()
         })
@@ -232,7 +228,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
                   <AlertDialogTitle>¿Aplicar recargos automáticos?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Esta acción aplicará recargos automáticamente a {deudasVencidas.length} deudas vencidas 
-                    según la configuración del sistema. Los montos totales y restantes se actualizarán. Esta acción no se puede deshacer.
+                    según la configuración del sistema. Los montos totales se actualizarán. Esta acción no se puede deshacer.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -294,7 +290,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
                           <AlertDialogTitle>¿Aplicar recargo individual?</AlertDialogTitle>
                           <AlertDialogDescription>
                             Se aplicará un recargo de {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoRecargo.toLocaleString()} 
-                            a la deuda de {deuda.cliente.nombre} {deuda.cliente.apellido}. El monto total y restante se actualizarán. Esta acción no se puede deshacer.
+                            a la deuda de {deuda.cliente.nombre} {deuda.cliente.apellido}. El monto total se actualizará. Esta acción no se puede deshacer.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

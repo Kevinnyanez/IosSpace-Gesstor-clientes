@@ -154,14 +154,13 @@ export function ConfiguracionPage() {
       for (const deuda of deudasParaRecargo) {
         const montoRecargo = Math.round((deuda.monto_restante * formData.porcentaje_recargo) / 100);
         const nuevoMontoTotal = deuda.monto_total + montoRecargo;
-        const nuevoMontoRestante = deuda.monto_restante + montoRecargo;
 
+        // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
         const { error } = await supabase
           .from('deudas')
           .update({
             recargos: deuda.recargos + montoRecargo,
             monto_total: nuevoMontoTotal,
-            monto_restante: nuevoMontoRestante,
             estado: 'vencido',
             fecha_ultimo_recargo: new Date().toISOString()
           })
