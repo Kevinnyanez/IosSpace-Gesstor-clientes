@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Save, Percent, Calendar, DollarSign, AlertTriangle } from "lucide-react";
+import { Settings, Save, Percent, Calendar, DollarSign, AlertTriangle, Trash2 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ export function ConfiguracionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [aplicandoRecargos, setAplicandoRecargos] = useState(false);
+  const [limpiandoHistorial, setLimpiandoHistorial] = useState(false);
   const [formData, setFormData] = useState({
     porcentaje_recargo: 10,
     dias_para_recargo: 30,
@@ -190,6 +191,41 @@ export function ConfiguracionPage() {
     }
   };
 
+  const limpiarHistorial = async () => {
+    setLimpiandoHistorial(true);
+    try {
+      console.log('Limpiando historial de pagos...');
+      
+      // Eliminar registros de historial_pagos más antiguos de 30 días
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 30);
+      
+      const { data, error } = await supabase
+        .from('historial_pagos')
+        .delete()
+        .lt('created_at', fechaLimite.toISOString());
+
+      if (error) {
+        console.error('Error limpiando historial:', error);
+        throw error;
+      }
+
+      toast({
+        title: "Historial limpiado",
+        description: "Se eliminaron los registros de pagos anteriores a 30 días",
+      });
+    } catch (error) {
+      console.error('Error limpiando historial:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo limpiar el historial de pagos",
+        variant: "destructive",
+      });
+    } finally {
+      setLimpiandoHistorial(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -312,6 +348,21 @@ export function ConfiguracionPage() {
               </Button>
             </div>
 
+            <div className="p-4 border rounded-lg border-red-200 bg-red-50">
+              <h3 className="font-semibold mb-2 text-red-900">Limpiar Historial</h3>
+              <p className="text-sm text-red-800 mb-3">
+                Elimina los registros del historial de pagos anteriores a 30 días. Esta acción no se puede deshacer.
+              </p>
+              <Button 
+                onClick={limpiarHistorial} 
+                disabled={limpiandoHistorial}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {limpiandoHistorial ? 'Limpiando Historial...' : 'Limpiar Historial (30+ días)'}
+              </Button>
+            </div>
+
             <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
               <h3 className="font-semibold mb-2 text-blue-900">Información</h3>
               <div className="text-sm text-blue-800 space-y-1">
@@ -320,6 +371,7 @@ export function ConfiguracionPage() {
                 <p>• Una vez aplicado, el estado cambia a "vencido"</p>
                 <p>• No se aplican recargos múltiples a la misma deuda</p>
                 <p>• Las deudas deben estar vencidas según los días configurados</p>
+                <p>• El historial se limpia automáticamente cada 30 días</p>
               </div>
             </div>
 
