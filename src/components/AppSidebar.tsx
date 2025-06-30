@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Home, Users, Package, CreditCard, Calendar, Settings } from "lucide-react";
+import { Home, Users, Package, CreditCard, Calendar, HelpCircle, Settings } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const menuItems = [
@@ -20,6 +20,7 @@ const menuItems = [
   { title: "Deudas", url: "/deudas", icon: CreditCard },
   { title: "Calendario", url: "/calendario", icon: Calendar },
   { title: "Inventario", url: "/inventario", icon: Package },
+  { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
 
