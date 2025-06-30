@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Save, Percent, Calendar, DollarSign, AlertTriangle, Trash2 } from "lucide-react";
+import { Settings, Save, Percent, Calendar, DollarSign, AlertTriangle, Trash2, TrashIcon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,7 @@ export function ConfiguracionPage() {
   const [saving, setSaving] = useState(false);
   const [aplicandoRecargos, setAplicandoRecargos] = useState(false);
   const [limpiandoHistorial, setLimpiandoHistorial] = useState(false);
+  const [limpiandoTodoHistorial, setLimpiandoTodoHistorial] = useState(false);
   const [formData, setFormData] = useState({
     porcentaje_recargo: 10,
     dias_para_recargo: 30,
@@ -226,6 +227,41 @@ export function ConfiguracionPage() {
     }
   };
 
+  const limpiarTodoHistorial = async () => {
+    if (!confirm('¿Estás seguro de que deseas eliminar TODO el historial de pagos? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    setLimpiandoTodoHistorial(true);
+    try {
+      console.log('Limpiando todo el historial de pagos...');
+      
+      const { data, error } = await supabase
+        .from('historial_pagos')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (error) {
+        console.error('Error limpiando todo el historial:', error);
+        throw error;
+      }
+
+      toast({
+        title: "Historial completamente limpiado",
+        description: "Se eliminaron todos los registros del historial de pagos",
+      });
+    } catch (error) {
+      console.error('Error limpiando todo el historial:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo limpiar todo el historial de pagos",
+        variant: "destructive",
+      });
+    } finally {
+      setLimpiandoTodoHistorial(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -351,16 +387,28 @@ export function ConfiguracionPage() {
             <div className="p-4 border rounded-lg border-red-200 bg-red-50">
               <h3 className="font-semibold mb-2 text-red-900">Limpiar Historial</h3>
               <p className="text-sm text-red-800 mb-3">
-                Elimina los registros del historial de pagos anteriores a 30 días. Esta acción no se puede deshacer.
+                Elimina los registros del historial de pagos. Puedes elegir eliminar solo los antiguos (30+ días) o todo el historial.
               </p>
-              <Button 
-                onClick={limpiarHistorial} 
-                disabled={limpiandoHistorial}
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {limpiandoHistorial ? 'Limpiando Historial...' : 'Limpiar Historial (30+ días)'}
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  onClick={limpiarHistorial} 
+                  disabled={limpiandoHistorial || limpiandoTodoHistorial}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {limpiandoHistorial ? 'Limpiando...' : 'Limpiar Historial (30+ días)'}
+                </Button>
+                
+                <Button 
+                  onClick={limpiarTodoHistorial} 
+                  disabled={limpiandoHistorial || limpiandoTodoHistorial}
+                  variant="destructive"
+                  className="w-full bg-red-800 hover:bg-red-900 text-white"
+                >
+                  <TrashIcon className="h-4 w-4 mr-2" />
+                  {limpiandoTodoHistorial ? 'Eliminando Todo...' : 'Eliminar TODO el Historial'}
+                </Button>
+              </div>
             </div>
 
             <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
