@@ -25,12 +25,23 @@ import { PagoCompletoForm } from "./PagoCompletoForm";
 import { AplicarRecargosForm } from "./AplicarRecargosForm";
 import { HistorialPagos } from "./HistorialPagos";
 import { MONEDAS, type DeudaConCliente } from "@/types";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 
 export function DeudasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [deudas, setDeudas] = useState<DeudaConCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('deudas');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Clientes por página
   const [stats, setStats] = useState({
     totalAdeudadoARS: 0,
     totalAdeudadoUSD: 0,
@@ -271,19 +282,25 @@ export function DeudasPage() {
     return variants[estado as keyof typeof variants] || variants.pendiente;
   };
 
-  // Agrupar deudas por concepto base (sin el sufijo de cuota)
-  const agruparDeudas = (deudas: DeudaConCliente[]) => {
+  // Agrupar deudas por cliente (todas las deudas de cada cliente juntas)
+  const agruparDeudasPorCliente = (deudas: DeudaConCliente[]) => {
     const grupos: { [key: string]: DeudaConCliente[] } = {};
     
     deudas.forEach(deuda => {
-      // Extraer el concepto base (sin "- Cuota X/Y")
-      const conceptoBase = deuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
-      const clienteKey = `${deuda.cliente_id}-${conceptoBase}`;
+      // Agrupar solo por cliente_id
+      const clienteKey = deuda.cliente_id;
       
       if (!grupos[clienteKey]) {
         grupos[clienteKey] = [];
       }
       grupos[clienteKey].push(deuda);
+    });
+    
+    // Ordenar las deudas dentro de cada grupo por fecha de vencimiento
+    Object.keys(grupos).forEach(key => {
+      grupos[key].sort((a, b) => 
+        new Date(a.fecha_vencimiento).getTime() - new Date(b.fecha_vencimiento).getTime()
+      );
     });
     
     return grupos;
@@ -295,7 +312,31 @@ export function DeudasPage() {
     deuda.cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const gruposDeudas = agruparDeudas(filteredDeudas);
+  const gruposDeudas = agruparDeudasPorCliente(filteredDeudas);
+  
+  // Obtener array de clientes ordenados por nombre
+  const clientesOrdenados = Object.entries(gruposDeudas)
+    .map(([clienteId, deudasCliente]) => ({
+      clienteId,
+      cliente: deudasCliente[0].cliente,
+      deudas: deudasCliente
+    }))
+    .sort((a, b) => {
+      const nombreA = `${a.cliente.nombre} ${a.cliente.apellido}`.toLowerCase();
+      const nombreB = `${b.cliente.nombre} ${b.cliente.apellido}`.toLowerCase();
+      return nombreA.localeCompare(nombreB);
+    });
+
+  // Calcular paginación
+  const totalPages = Math.ceil(clientesOrdenados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const clientesPaginados = clientesOrdenados.slice(startIndex, endIndex);
+  
+  // Resetear a página 1 cuando cambia el término de búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   if (loading) {
     return (
@@ -412,11 +453,18 @@ export function DeudasPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Registro de Deudas ({Object.keys(gruposDeudas).length} productos)</CardTitle>
+                <CardTitle>
+                  Registro de Deudas ({clientesOrdenados.length} {clientesOrdenados.length === 1 ? 'cliente' : 'clientes'})
+                  {searchTerm && (
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      - {clientesPaginados.length} mostrados
+                    </span>
+                  )}
+                </CardTitle>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    placeholder="Buscar deudas..."
+                    placeholder="Buscar por cliente o concepto..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 w-64"
@@ -425,7 +473,7 @@ export function DeudasPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {Object.keys(gruposDeudas).length === 0 ? (
+              {clientesOrdenados.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No hay deudas registradas</p>
                   <div className="mt-4">
@@ -433,52 +481,74 @@ export function DeudasPage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {Object.entries(gruposDeudas).map(([key, deudas]) => {
-                    const primeraDeuda = deudas[0];
-                    const conceptoBase = primeraDeuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
-                    const totalCuotas = deudas.length;
-                    const cuotasPagadas = deudas.filter(d => d.estado === 'pagado').length;
-                    const montoTotalGrupo = deudas.reduce((sum, d) => sum + d.monto_total, 0);
-                    const montoAbonadoGrupo = deudas.reduce((sum, d) => sum + d.monto_abonado, 0);
-                    const montoRestanteGrupo = deudas.reduce((sum, d) => sum + d.monto_restante, 0);
-                    const deudasPendientes = deudas.filter(d => d.estado !== 'pagado');
-                    
-                    return (
-                      <Card key={key} className="border-l-4 border-l-orange-500">
-                        <CardHeader className="pb-4">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h3 className="font-semibold text-lg text-gray-900">
-                                {primeraDeuda.cliente.nombre} {primeraDeuda.cliente.apellido}
-                              </h3>
-                              <p className="text-gray-600">{conceptoBase}</p>
-                              <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                                <span>Cuotas: {cuotasPagadas}/{totalCuotas}</span>
-                                <span>Total: ${montoTotalGrupo.toLocaleString()}</span>
-                                <span>Restante: ${montoRestanteGrupo.toLocaleString()}</span>
-                              </div>
-                            </div>
-                            <div className="text-right space-y-2">
-                              <div className="flex items-center gap-2">
+                <>
+                  <div className="space-y-6">
+                    {clientesPaginados.map(({ clienteId, cliente, deudas }) => {
+                      // Agrupar deudas por concepto (producto) dentro del cliente
+                      const deudasPorConcepto: { [concepto: string]: DeudaConCliente[] } = {};
+                      deudas.forEach(deuda => {
+                        const conceptoBase = deuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
+                        if (!deudasPorConcepto[conceptoBase]) {
+                          deudasPorConcepto[conceptoBase] = [];
+                        }
+                        deudasPorConcepto[conceptoBase].push(deuda);
+                      });
+
+                      // Calcular totales del cliente
+                      const montoTotalCliente = deudas.reduce((sum, d) => sum + d.monto_total, 0);
+                      const montoAbonadoCliente = deudas.reduce((sum, d) => sum + d.monto_abonado, 0);
+                      const montoRestanteCliente = deudas.reduce((sum, d) => sum + d.monto_restante, 0);
+                      const deudasPendientesCliente = deudas.filter(d => d.estado !== 'pagado');
+                      const totalDeudas = deudas.length;
+                      const deudasPagadas = deudas.filter(d => d.estado === 'pagado').length;
+                      
+                      return (
+                        <Card key={clienteId} className="border-l-4 border-l-blue-500 shadow-sm">
+                          <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4 flex-1">
+                                <div>
+                                  <h3 className="font-bold text-lg text-gray-900">
+                                    {cliente.nombre} {cliente.apellido}
+                                  </h3>
+                                  {cliente.telefono && (
+                                    <p className="text-xs text-gray-600 mt-0.5">📞 {cliente.telefono}</p>
+                                  )}
+                                </div>
                                 <Badge 
-                                  className={montoRestanteGrupo <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
+                                  className={montoRestanteCliente <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
                                   variant="outline"
                                 >
-                                  {montoRestanteGrupo <= 0 ? 'Pagado' : 'Pendiente'}
+                                  {montoRestanteCliente <= 0 ? 'Al día' : 'Pendiente'}
                                 </Badge>
+                                <div className="text-xs text-gray-600">
+                                  {deudasPagadas}/{totalDeudas} pagadas
+                                </div>
+                                <div className="text-sm">
+                                  <span className="text-gray-700 font-semibold">
+                                    Total: ${montoTotalCliente.toLocaleString()} {deudas[0]?.moneda || 'ARS'}
+                                  </span>
+                                  <span className={montoRestanteCliente > 0 ? 'text-red-600 font-semibold ml-3' : 'text-green-600 ml-3'}>
+                                    Resta: ${montoRestanteCliente.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {deudasPendientesCliente.length > 1 && (
+                                  <PagoCompletoForm deudas={deudasPendientesCliente} onPagoCreated={fetchDeudas} />
+                                )}
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                                      <X className="h-4 w-4 mr-1" />
-                                      Eliminar Todas
+                                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 h-8">
+                                      <X className="h-3 w-3 mr-1" />
+                                      Eliminar
                                     </Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>¿Eliminar todas las cuotas?</AlertDialogTitle>
+                                      <AlertDialogTitle>¿Eliminar todas las deudas de {cliente.nombre} {cliente.apellido}?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Esta acción eliminará permanentemente todas las {totalCuotas} cuotas de "{conceptoBase}" y todos sus pagos asociados. Esta acción no se puede deshacer.
+                                        Esta acción eliminará permanentemente todas las {totalDeudas} deudas y todos sus pagos asociados. Esta acción no se puede deshacer.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -493,93 +563,168 @@ export function DeudasPage() {
                                   </AlertDialogContent>
                                 </AlertDialog>
                               </div>
-                              {deudasPendientes.length > 1 && (
-                                <div>
-                                  <PagoCompletoForm deudas={deudasPendientes} onPagoCreated={fetchDeudas} />
-                                </div>
-                              )}
                             </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {deudas.map((deuda, index) => (
-                              <div key={deuda.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-8 h-8 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-sm font-semibold">
-                                    {index + 1}
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-gray-900">
-                                      ${deuda.monto_total.toLocaleString()}
-                                      {deuda.recargos > 0 && (
-                                        <span className="text-orange-600 ml-2">
-                                          (+${deuda.recargos.toLocaleString()} recargo)
-                                        </span>
-                                      )}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                                      <Calendar className="h-4 w-4" />
-                                      {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR')}
+                          </CardHeader>
+                          <CardContent className="pt-3 pb-3">
+                            <div className="space-y-2">
+                              {Object.entries(deudasPorConcepto).map(([conceptoBase, deudasConcepto]) => {
+                                const montoTotalConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_total, 0);
+                                const montoRestanteConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_restante, 0);
+                                
+                                return (
+                                  <div key={conceptoBase} className="border-l-2 border-l-orange-300 pl-3 py-1">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <h4 className="font-semibold text-sm text-gray-800">{conceptoBase}</h4>
+                                      <div className="text-xs text-gray-600">
+                                        <span className="font-medium">${montoTotalConcepto.toLocaleString()}</span>
+                                        {montoRestanteConcepto > 0 && (
+                                          <span className="text-red-600 ml-1">
+                                            (Resta: ${montoRestanteConcepto.toLocaleString()})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      {deudasConcepto.map((deuda, index) => (
+                                        <div key={deuda.id} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded text-xs">
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <span className="w-5 h-5 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-semibold">
+                                              {index + 1}
+                                            </span>
+                                            <span className="font-medium text-gray-900">
+                                              ${deuda.monto_total.toLocaleString()}
+                                              {deuda.recargos > 0 && (
+                                                <span className="text-orange-600 ml-1">
+                                                  (+${deuda.recargos.toLocaleString()})
+                                                </span>
+                                              )}
+                                            </span>
+                                            <span className="text-gray-500">
+                                              <Calendar className="h-3 w-3 inline mr-0.5" />
+                                              {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                            </span>
+                                            <span className="text-gray-500">
+                                              Abonado: ${deuda.monto_abonado.toLocaleString()}
+                                            </span>
+                                            <span className={deuda.monto_restante > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>
+                                              Resta: ${deuda.monto_restante.toLocaleString()}
+                                            </span>
+                                            <Badge 
+                                              className={`${getEstadoBadge(deuda.estado).color} text-xs px-1.5 py-0`}
+                                              variant="outline"
+                                            >
+                                              {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
+                                            </Badge>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            {deuda.estado !== 'pagado' && (
+                                              <AbonoForm deuda={deuda} onAbonoCreated={fetchDeudas} />
+                                            )}
+                                            <AlertDialog>
+                                              <AlertDialogTrigger asChild>
+                                                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 h-6 w-6 p-0">
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              </AlertDialogTrigger>
+                                              <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                                  <AlertDialogDescription>
+                                                    Esta acción eliminará permanentemente la deuda y todos sus pagos asociados. Esta acción no se puede deshacer.
+                                                  </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                  <AlertDialogAction 
+                                                    onClick={() => handleDeleteDeuda(deuda.id)}
+                                                    className="bg-red-600 hover:bg-red-700"
+                                                  >
+                                                    Eliminar
+                                                  </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                              </AlertDialogContent>
+                                            </AlertDialog>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="text-right text-sm">
-                                    <p className="text-gray-600">
-                                      Abonado: ${deuda.monto_abonado.toLocaleString()}
-                                    </p>
-                                    <p className={deuda.monto_restante > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>
-                                      Resta: ${deuda.monto_restante.toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <Badge 
-                                    className={getEstadoBadge(deuda.estado).color}
-                                    variant="outline"
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Paginación */}
+                  {totalPages > 1 && (
+                    <div className="mt-6 flex items-center justify-center">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentPage > 1) setCurrentPage(currentPage - 1);
+                              }}
+                              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                            />
+                          </PaginationItem>
+                          
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                            // Mostrar solo algunas páginas alrededor de la actual
+                            if (
+                              page === 1 ||
+                              page === totalPages ||
+                              (page >= currentPage - 1 && page <= currentPage + 1)
+                            ) {
+                              return (
+                                <PaginationItem key={page}>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setCurrentPage(page);
+                                    }}
+                                    isActive={currentPage === page}
+                                    className="cursor-pointer"
                                   >
-                                    {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
-                                  </Badge>
-                                  <div className="flex items-center gap-2">
-                                    {deuda.estado !== 'pagado' && (
-                                      <AbonoForm deuda={deuda} onAbonoCreated={fetchDeudas} />
-                                    )}
-                                    <Button variant="outline" size="sm">
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Esta acción eliminará permanentemente la deuda y todos sus pagos asociados. Esta acción no se puede deshacer.
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                          <AlertDialogAction 
-                                            onClick={() => handleDeleteDeuda(deuda.id)}
-                                            className="bg-red-600 hover:bg-red-700"
-                                          >
-                                            Eliminar
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            } else if (page === currentPage - 2 || page === currentPage + 2) {
+                              return (
+                                <PaginationItem key={page}>
+                                  <PaginationEllipsis />
+                                </PaginationItem>
+                              );
+                            }
+                            return null;
+                          })}
+                          
+                          <PaginationItem>
+                            <PaginationNext 
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                              }}
+                              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                  
+                  <div className="mt-4 text-center text-sm text-gray-500">
+                    Mostrando {startIndex + 1} - {Math.min(endIndex, clientesOrdenados.length)} de {clientesOrdenados.length} clientes
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

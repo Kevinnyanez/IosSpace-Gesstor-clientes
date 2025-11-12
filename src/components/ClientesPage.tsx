@@ -20,12 +20,15 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ClienteForm } from "./ClienteForm";
+import { ClienteDeudasDialog } from "./ClienteDeudasDialog";
 import type { Cliente } from "@/types";
+import { CreditCard } from "lucide-react";
 
 export function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [viewingDeudasCliente, setViewingDeudasCliente] = useState<Cliente | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -189,6 +192,15 @@ export function ClientesPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => setViewingDeudasCliente(cliente)}
+                          className="text-blue-600 hover:text-blue-700"
+                          title="Ver deudas"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setEditingCliente(cliente)}
                         >
                           <Edit className="h-4 w-4" />
@@ -258,6 +270,15 @@ export function ClientesPage() {
             setEditingCliente(null);
           }}
           onClose={() => setEditingCliente(null)}
+        />
+      )}
+
+      {viewingDeudasCliente && (
+        <ClienteDeudasDialog
+          cliente={viewingDeudasCliente}
+          open={!!viewingDeudasCliente}
+          onOpenChange={(open) => !open && setViewingDeudasCliente(null)}
+          onDeudaUpdated={fetchClientes}
         />
       )}
     </div>
