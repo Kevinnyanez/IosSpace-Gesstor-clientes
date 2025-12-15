@@ -5,10 +5,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, CreditCard, DollarSign, X, Printer } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, X, Printer, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AbonoForm } from "./AbonoForm";
@@ -74,10 +85,74 @@ export function ClienteDeudasDialog({ cliente, open, onOpenChange, onDeudaUpdate
     deudasPorConcepto[conceptoBase].push(deuda);
   });
 
-  // Calcular totales
-  const montoTotal = deudas.reduce((sum, d) => sum + d.monto_total, 0);
-  const montoRestante = deudas.reduce((sum, d) => sum + d.monto_restante, 0);
+  // Calcular totales separados por moneda
+  const totalesARS = deudas
+    .filter(d => d.moneda === 'ARS')
+    .reduce((acc, d) => ({
+      total: acc.total + d.monto_total,
+      restante: acc.restante + d.monto_restante,
+      abonado: acc.abonado + d.monto_abonado
+    }), { total: 0, restante: 0, abonado: 0 });
+
+  const totalesUSD = deudas
+    .filter(d => d.moneda === 'USD')
+    .reduce((acc, d) => ({
+      total: acc.total + d.monto_total,
+      restante: acc.restante + d.monto_restante,
+      abonado: acc.abonado + d.monto_abonado
+    }), { total: 0, restante: 0, abonado: 0 });
+
   const deudasPendientes = deudas.filter(d => d.estado !== 'pagado');
+  const deudasPagadas = deudas.filter(d => d.monto_restante <= 0);
+
+  const limpiarDeudasPagadas = async () => {
+    if (deudasPagadas.length === 0) {
+      toast({
+        title: "No hay deudas pagadas",
+        description: "No hay deudas completamente pagadas para eliminar",
+      });
+      return;
+    }
+
+    try {
+      // Obtener IDs de las deudas pagadas
+      const idsDeudasPagadas = deudasPagadas.map(d => d.id);
+
+      // Primero eliminar los pagos relacionados
+      for (const deudaId of idsDeudasPagadas) {
+        const { error: pagosError } = await supabase
+          .from('pagos')
+          .delete()
+          .eq('deuda_id', deudaId);
+
+        if (pagosError) throw pagosError;
+      }
+
+      // Luego eliminar las deudas
+      const { error: deudasError } = await supabase
+        .from('deudas')
+        .delete()
+        .in('id', idsDeudasPagadas);
+
+      if (deudasError) throw deudasError;
+
+      toast({
+        title: "Deudas pagadas eliminadas",
+        description: `Se eliminaron ${deudasPagadas.length} ${deudasPagadas.length === 1 ? 'deuda' : 'deudas'} completamente pagadas`,
+      });
+
+      // Recargar las deudas
+      fetchDeudas();
+      onDeudaUpdated?.();
+    } catch (error) {
+      console.error('Error limpiando deudas pagadas:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar las deudas pagadas",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getEstadoBadge = (estado: string) => {
     const variants = {
@@ -560,23 +635,61 @@ export function ClienteDeudasDialog({ cliente, open, onOpenChange, onDeudaUpdate
           </div>
 
           <div class="resumen">
-            <div class="resumen-grid">
-              <div class="resumen-item">
-                <h3>Total Adeudado</h3>
-                <p>$${montoTotal.toLocaleString()} ${deudas[0]?.moneda || 'ARS'}</p>
+            ${totalesARS.total > 0 || totalesUSD.total > 0 ? `
+              <div style="display: grid; grid-template-columns: ${totalesARS.total > 0 && totalesUSD.total > 0 ? '1fr 1fr' : '1fr'}; gap: 20px; margin-bottom: 20px;">
+                ${totalesARS.total > 0 ? `
+                  <div style="border-left: 4px solid #2563eb; padding-left: 15px;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #666; text-transform: uppercase; font-weight: bold;">Pesos Argentinos (ARS)</h3>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                      <div>
+                        <h4 style="margin: 0 0 5px 0; font-size: 11px; color: #666; text-transform: uppercase;">Total</h4>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold;">$${totalesARS.total.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <h4 style="margin: 0 0 5px 0; font-size: 11px; color: #666; text-transform: uppercase;">Restante</h4>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: ${totalesARS.restante > 0 ? '#dc2626' : '#16a34a'}">
+                          $${totalesARS.restante.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 style="margin: 0 0 5px 0; font-size: 11px; color: #666; text-transform: uppercase;">Abonado</h4>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #16a34a">
+                          $${totalesARS.abonado.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ` : ''}
+                ${totalesUSD.total > 0 ? `
+                  <div style="border-left: 4px solid #16a34a; padding-left: 15px;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #666; text-transform: uppercase; font-weight: bold;">Dólares Estadounidenses (USD)</h3>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                      <div>
+                        <h4 style="margin: 0 0 5px 0; font-size: 11px; color: #666; text-transform: uppercase;">Total</h4>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold;">US$${totalesUSD.total.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <h4 style="margin: 0 0 5px 0; font-size: 11px; color: #666; text-transform: uppercase;">Restante</h4>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: ${totalesUSD.restante > 0 ? '#dc2626' : '#16a34a'}">
+                          US$${totalesUSD.restante.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 style="margin: 0 0 5px 0; font-size: 11px; color: #666; text-transform: uppercase;">Abonado</h4>
+                        <p style="margin: 0; font-size: 18px; font-weight: bold; color: #16a34a">
+                          US$${totalesUSD.abonado.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ` : ''}
               </div>
-              <div class="resumen-item">
-                <h3>Monto Restante</h3>
-                <p style="color: ${montoRestante > 0 ? '#dc2626' : '#16a34a'}">
-                  $${montoRestante.toLocaleString()} ${deudas[0]?.moneda || 'ARS'}
-                </p>
-              </div>
-              <div class="resumen-item">
-                <h3>Estado</h3>
-                <p style="color: ${montoRestante <= 0 ? '#16a34a' : '#ea580c'}">
-                  ${montoRestante <= 0 ? 'Al día' : 'Pendiente'}
-                </p>
-              </div>
+            ` : ''}
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #e5e7eb;">
+              <h3 style="margin: 0 0 5px 0; font-size: 12px; color: #666; text-transform: uppercase;">Estado General</h3>
+              <p style="margin: 0; font-size: 16px; font-weight: bold; color: ${(totalesARS.restante + totalesUSD.restante) <= 0 ? '#16a34a' : '#ea580c'}">
+                ${(totalesARS.restante + totalesUSD.restante) <= 0 ? 'Al día' : 'Pendiente'}
+              </p>
             </div>
           </div>
 
@@ -589,8 +702,8 @@ export function ClienteDeudasDialog({ cliente, open, onOpenChange, onDeudaUpdate
                 <div class="concepto-header">
                   <h3>${conceptoBase}</h3>
                   <div class="concepto-totales">
-                    Total: <strong>$${montoTotalConcepto.toLocaleString()}</strong>
-                    ${montoRestanteConcepto > 0 ? ` | Resta: <strong style="color: #dc2626">$${montoRestanteConcepto.toLocaleString()}</strong>` : ''}
+                    Total: <strong>${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoTotalConcepto.toLocaleString()} ${deudasConcepto[0]?.moneda || 'ARS'}</strong>
+                    ${montoRestanteConcepto > 0 ? ` | Resta: <strong style="color: #dc2626">${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoRestanteConcepto.toLocaleString()} ${deudasConcepto[0]?.moneda || 'ARS'}</strong>` : ''}
                   </div>
                 </div>
                 ${deudasConcepto.map((deuda, index) => {
@@ -598,17 +711,17 @@ export function ClienteDeudasDialog({ cliente, open, onOpenChange, onDeudaUpdate
                     <div class="deuda-item">
                       <div class="deuda-numero">${index + 1}</div>
                       <div class="deuda-monto">
-                        $${deuda.monto_total.toLocaleString()}
-                        ${deuda.recargos > 0 ? `<span class="recargo"> (+$${deuda.recargos.toLocaleString()} recargo)</span>` : ''}
+                        ${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.monto_total.toLocaleString()} ${deuda.moneda}
+                        ${deuda.recargos > 0 ? `<span class="recargo"> (+${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.recargos.toLocaleString()} recargo)</span>` : ''}
                       </div>
                       <div class="deuda-fecha">
                         Vence: ${new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR')}
                       </div>
                       <div class="deuda-abonado">
-                        Abonado: $${deuda.monto_abonado.toLocaleString()}
+                        Abonado: ${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.monto_abonado.toLocaleString()}
                       </div>
                       <div class="deuda-restante ${deuda.monto_restante > 0 ? 'pendiente' : 'pagado'}">
-                        Resta: $${deuda.monto_restante.toLocaleString()}
+                        Resta: ${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.monto_restante.toLocaleString()}
                       </div>
                     </div>
                   `;
@@ -671,34 +784,114 @@ export function ClienteDeudasDialog({ cliente, open, onOpenChange, onDeudaUpdate
             {/* Resumen */}
             <Card className="bg-gradient-to-r from-blue-50 to-indigo-50">
               <CardContent className="pt-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Adeudado</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      ${montoTotal.toLocaleString()} {deudas[0]?.moneda || 'ARS'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Restante</p>
-                    <p className={`text-2xl font-bold ${montoRestante > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      ${montoRestante.toLocaleString()} {deudas[0]?.moneda || 'ARS'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Estado</p>
-                    <Badge 
-                      className={montoRestante <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
-                      variant="outline"
-                    >
-                      {montoRestante <= 0 ? 'Al día' : 'Pendiente'}
-                    </Badge>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Totales en Pesos (ARS) */}
+                  {totalesARS.total > 0 && (
+                    <div className="border-l-4 border-l-blue-600 pl-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase">Pesos Argentinos (ARS)</h3>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-600">Total Adeudado</p>
+                          <p className="text-xl font-bold text-gray-900">
+                            ${totalesARS.total.toLocaleString()} ARS
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Restante</p>
+                          <p className={`text-xl font-bold ${totalesARS.restante > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            ${totalesARS.restante.toLocaleString()} ARS
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Abonado</p>
+                          <p className="text-xl font-bold text-green-600">
+                            ${totalesARS.abonado.toLocaleString()} ARS
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Totales en Dólares (USD) */}
+                  {totalesUSD.total > 0 && (
+                    <div className="border-l-4 border-l-green-600 pl-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase">Dólares Estadounidenses (USD)</h3>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-600">Total Adeudado</p>
+                          <p className="text-xl font-bold text-gray-900">
+                            US${totalesUSD.total.toLocaleString()} USD
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Restante</p>
+                          <p className={`text-xl font-bold ${totalesUSD.restante > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            US${totalesUSD.restante.toLocaleString()} USD
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Abonado</p>
+                          <p className="text-xl font-bold text-green-600">
+                            US${totalesUSD.abonado.toLocaleString()} USD
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Estado General */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Estado General</p>
+                      <Badge 
+                        className={(totalesARS.restante + totalesUSD.restante) <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
+                        variant="outline"
+                      >
+                        {(totalesARS.restante + totalesUSD.restante) <= 0 ? 'Al día' : 'Pendiente'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {deudasPagadas.length > 0 && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Limpiar Deudas Pagadas ({deudasPagadas.length})
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Limpiar deudas pagadas?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Se eliminarán {deudasPagadas.length} {deudasPagadas.length === 1 ? 'deuda completamente pagada' : 'deudas completamente pagadas'} de {cliente.nombre} {cliente.apellido}.
+                                <br /><br />
+                                <strong>Esta acción no se puede deshacer.</strong> Los pagos se registrarán en el historial antes de eliminar las deudas.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={limpiarDeudasPagadas}
+                                className="bg-orange-600 hover:bg-orange-700"
+                              >
+                                Limpiar Deudas
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                      {deudasPendientes.length > 1 && (
+                        <PagoCompletoForm deudas={deudasPendientes} onPagoCreated={handleDeudaUpdated} />
+                      )}
+                    </div>
                   </div>
                 </div>
-                {deudasPendientes.length > 1 && (
-                  <div className="mt-4">
-                    <PagoCompletoForm deudas={deudasPendientes} onPagoCreated={handleDeudaUpdated} />
-                  </div>
-                )}
               </CardContent>
             </Card>
 

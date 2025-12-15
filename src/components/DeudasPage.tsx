@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X, Printer } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   AlertDialog,
@@ -235,6 +235,289 @@ export function DeudasPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePrintDeuda = (cliente: DeudaConCliente['cliente'], conceptoBase: string, deudasConcepto: DeudaConCliente[]) => {
+    // Crear una nueva ventana para imprimir todas las cuotas de esta deuda
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    // Calcular totales del concepto
+    const montoTotalConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_total, 0);
+    const montoAbonadoConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_abonado, 0);
+    const montoRestanteConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_restante, 0);
+    const recargosConcepto = deudasConcepto.reduce((sum, d) => sum + d.recargos, 0);
+
+    // Generar el HTML para imprimir todas las cuotas de la deuda
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Deuda - ${cliente.nombre} ${cliente.apellido}</title>
+          <style>
+            @media print {
+              @page {
+                margin: 1cm;
+              }
+            }
+            body {
+              font-family: Arial, sans-serif;
+              padding: 20px;
+              color: #000;
+            }
+            .header {
+              border-bottom: 3px solid #2563eb;
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 24px;
+              color: #1e40af;
+            }
+            .header-info {
+              margin-top: 10px;
+              font-size: 14px;
+              color: #666;
+            }
+            .resumen {
+              background: #f0f9ff;
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+              border-left: 4px solid #2563eb;
+            }
+            .resumen-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 20px;
+            }
+            .resumen-item h3 {
+              margin: 0 0 5px 0;
+              font-size: 12px;
+              color: #666;
+              text-transform: uppercase;
+            }
+            .resumen-item p {
+              margin: 0;
+              font-size: 20px;
+              font-weight: bold;
+            }
+            .concepto-section {
+              margin-bottom: 25px;
+              page-break-inside: avoid;
+            }
+            .concepto-header {
+              background: #fff7ed;
+              padding: 12px;
+              border-left: 4px solid #f97316;
+              margin-bottom: 10px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .concepto-header h3 {
+              margin: 0;
+              font-size: 16px;
+              font-weight: bold;
+            }
+            .concepto-totales {
+              font-size: 14px;
+              color: #666;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+              background: white;
+            }
+            thead tr {
+              background: #f3f4f6;
+              border-bottom: 2px solid #e5e7eb;
+            }
+            th {
+              padding: 12px;
+              text-align: left;
+              font-size: 12px;
+              font-weight: bold;
+              color: #666;
+              text-transform: uppercase;
+              border-right: 1px solid #e5e7eb;
+            }
+            tbody tr {
+              border-bottom: 1px solid #e5e7eb;
+            }
+            tbody tr:nth-child(even) {
+              background: #f9fafb;
+            }
+            td {
+              padding: 15px;
+              font-size: 14px;
+              border-right: 1px solid #e5e7eb;
+            }
+            .footer {
+              margin-top: 30px;
+              padding-top: 15px;
+              border-top: 2px solid #e5e7eb;
+              text-align: center;
+              font-size: 12px;
+              color: #666;
+            }
+            .recargo {
+              color: #ea580c;
+              font-size: 11px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Detalle de Deuda</h1>
+            <div class="header-info">
+              <strong>Cliente:</strong> ${cliente.nombre} ${cliente.apellido}<br>
+              ${cliente.telefono ? `<strong>Teléfono:</strong> ${cliente.telefono}<br>` : ''}
+              ${cliente.email ? `<strong>Email:</strong> ${cliente.email}<br>` : ''}
+              <strong>Fecha de impresión:</strong> ${new Date().toLocaleDateString('es-AR', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          </div>
+
+          <div class="resumen">
+            <div class="resumen-grid">
+              <div class="resumen-item">
+                <h3>Total de la Deuda</h3>
+                <p>${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoTotalConcepto.toLocaleString()} ${deudasConcepto[0]?.moneda || 'ARS'}</p>
+              </div>
+              <div class="resumen-item">
+                <h3>Monto Abonado</h3>
+                <p style="color: #16a34a">
+                  ${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoAbonadoConcepto.toLocaleString()} ${deudasConcepto[0]?.moneda || 'ARS'}
+                </p>
+              </div>
+              <div class="resumen-item">
+                <h3>Monto Restante</h3>
+                <p style="color: ${montoRestanteConcepto > 0 ? '#dc2626' : '#16a34a'}">
+                  ${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoRestanteConcepto.toLocaleString()} ${deudasConcepto[0]?.moneda || 'ARS'}
+                </p>
+              </div>
+            </div>
+            ${recargosConcepto > 0 ? `
+              <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #e5e7eb;">
+                <h3 style="margin: 0 0 5px 0; font-size: 12px; color: #666; text-transform: uppercase;">Total Recargos Aplicados</h3>
+                <p style="margin: 0; font-size: 18px; font-weight: bold; color: #ea580c;">
+                  ${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${recargosConcepto.toLocaleString()} ${deudasConcepto[0]?.moneda || 'ARS'}
+                </p>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="concepto-section">
+            <div class="concepto-header">
+              <h3>${conceptoBase}</h3>
+              <div class="concepto-totales">
+                ${deudasConcepto.length} ${deudasConcepto.length === 1 ? 'cuota' : 'cuotas'} registradas
+              </div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th>Cuota</th>
+                  <th>Monto Total</th>
+                  <th>Fecha Vencimiento</th>
+                  <th>Abonado</th>
+                  <th>Restante</th>
+                  <th>Recargos</th>
+                  <th style="text-align: center;">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${deudasConcepto.map((deuda, index) => {
+                  return `
+                    <tr>
+                      <td style="font-weight: bold; color: #9a3412;">
+                        ${index + 1} / ${deudasConcepto.length}
+                      </td>
+                      <td style="font-weight: bold;">
+                        ${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.monto_total.toLocaleString()} ${deuda.moneda}
+                      </td>
+                      <td>
+                        ${new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR', { 
+                          weekday: 'short', 
+                          day: '2-digit', 
+                          month: '2-digit', 
+                          year: 'numeric' 
+                        })}
+                      </td>
+                      <td style="color: #16a34a; font-weight: bold;">
+                        ${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.monto_abonado.toLocaleString()}
+                      </td>
+                      <td style="font-weight: bold; color: ${deuda.monto_restante > 0 ? '#dc2626' : '#16a34a'};">
+                        ${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.monto_restante.toLocaleString()}
+                      </td>
+                      <td style="color: ${deuda.recargos > 0 ? '#ea580c' : '#666'}; font-weight: ${deuda.recargos > 0 ? 'bold' : 'normal'};">
+                        ${deuda.recargos > 0 ? `${deuda.moneda === 'USD' ? 'US$' : '$'}${deuda.recargos.toLocaleString()}` : '-'}
+                      </td>
+                      <td style="text-align: center;">
+                        <span style="display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; 
+                          background: ${deuda.estado === 'pagado' ? '#d1fae5' : deuda.estado === 'vencido' ? '#fee2e2' : '#fef3c7'}; 
+                          color: ${deuda.estado === 'pagado' ? '#065f46' : deuda.estado === 'vencido' ? '#991b1b' : '#92400e'};">
+                          ${deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
+                        </span>
+                      </td>
+                    </tr>
+                    ${deuda.notas ? `
+                      <tr>
+                        <td colspan="7" style="padding: 10px 15px; background: #f0f9ff; border-left: 3px solid #2563eb;">
+                          <strong style="font-size: 11px; color: #666; text-transform: uppercase;">Notas Cuota ${index + 1}:</strong>
+                          <span style="font-size: 12px; color: #000; margin-left: 5px;">${deuda.notas}</span>
+                        </td>
+                      </tr>
+                    ` : ''}
+                  `;
+                }).join('')}
+                <tr style="background: #fff7ed; border-top: 3px solid #f97316; font-weight: bold;">
+                  <td colspan="2">TOTALES</td>
+                  <td>-</td>
+                  <td style="color: #16a34a;">${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoAbonadoConcepto.toLocaleString()}</td>
+                  <td style="color: ${montoRestanteConcepto > 0 ? '#dc2626' : '#16a34a'};">
+                    ${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${montoRestanteConcepto.toLocaleString()}
+                  </td>
+                  <td style="color: ${recargosConcepto > 0 ? '#ea580c' : '#666'};">
+                    ${recargosConcepto > 0 ? `${deudasConcepto[0]?.moneda === 'USD' ? 'US$' : '$'}${recargosConcepto.toLocaleString()}` : '-'}
+                  </td>
+                  <td style="text-align: center;">
+                    <span style="color: ${montoRestanteConcepto <= 0 ? '#16a34a' : '#ea580c'};">
+                      ${montoRestanteConcepto <= 0 ? 'PAGADO' : 'PENDIENTE'}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="footer">
+            <p><strong>IosSpace</strong> - Sistema de Gestión de Deudas</p>
+            <p>Desarrollado por <strong>AppyStudios</strong></p>
+            <p>Documento generado el ${new Date().toLocaleDateString('es-AR')}</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // Esperar a que se cargue el contenido y luego imprimir
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    };
   };
 
   const handleDeleteGrupoDeudas = async (deudas: DeudaConCliente[]) => {
@@ -483,60 +766,101 @@ export function DeudasPage() {
               ) : (
                 <>
                   <div className="space-y-6">
-                    {clientesPaginados.map(({ clienteId, cliente, deudas }) => {
-                      // Agrupar deudas por concepto (producto) dentro del cliente
-                      const deudasPorConcepto: { [concepto: string]: DeudaConCliente[] } = {};
-                      deudas.forEach(deuda => {
-                        const conceptoBase = deuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
-                        if (!deudasPorConcepto[conceptoBase]) {
-                          deudasPorConcepto[conceptoBase] = [];
-                        }
-                        deudasPorConcepto[conceptoBase].push(deuda);
-                      });
+  {clientesPaginados.map(({ clienteId, cliente, deudas }) => {
+    // Agrupar deudas por concepto (producto)
+    const deudasPorConcepto: { [concepto: string]: DeudaConCliente[] } = {};
+    deudas.forEach(deuda => {
+      const conceptoBase = deuda.concepto.replace(/ - Cuota \d+\/\d+/, '');
+      if (!deudasPorConcepto[conceptoBase]) {
+        deudasPorConcepto[conceptoBase] = [];
+      }
+      deudasPorConcepto[conceptoBase].push(deuda);
+    });
 
-                      // Calcular totales del cliente
-                      const montoTotalCliente = deudas.reduce((sum, d) => sum + d.monto_total, 0);
-                      const montoAbonadoCliente = deudas.reduce((sum, d) => sum + d.monto_abonado, 0);
-                      const montoRestanteCliente = deudas.reduce((sum, d) => sum + d.monto_restante, 0);
-                      const deudasPendientesCliente = deudas.filter(d => d.estado !== 'pagado');
-                      const totalDeudas = deudas.length;
-                      const deudasPagadas = deudas.filter(d => d.estado === 'pagado').length;
-                      
-                      return (
-                        <Card key={clienteId} className="border-l-4 border-l-blue-500 shadow-sm">
-                          <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4 flex-1">
-                                <div>
-                                  <h3 className="font-bold text-lg text-gray-900">
-                                    {cliente.nombre} {cliente.apellido}
-                                  </h3>
-                                  {cliente.telefono && (
-                                    <p className="text-xs text-gray-600 mt-0.5">📞 {cliente.telefono}</p>
-                                  )}
-                                </div>
-                                <Badge 
-                                  className={montoRestanteCliente <= 0 ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}
-                                  variant="outline"
-                                >
-                                  {montoRestanteCliente <= 0 ? 'Al día' : 'Pendiente'}
-                                </Badge>
-                                <div className="text-xs text-gray-600">
-                                  {deudasPagadas}/{totalDeudas} pagadas
-                                </div>
-                                <div className="text-sm">
-                                  <span className="text-gray-700 font-semibold">
-                                    Total: ${montoTotalCliente.toLocaleString()} {deudas[0]?.moneda || 'ARS'}
-                                  </span>
-                                  <span className={montoRestanteCliente > 0 ? 'text-red-600 font-semibold ml-3' : 'text-green-600 ml-3'}>
-                                    Resta: ${montoRestanteCliente.toLocaleString()}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {deudasPendientesCliente.length > 1 && (
-                                  <PagoCompletoForm deudas={deudasPendientesCliente} onPagoCreated={fetchDeudas} />
-                                )}
+    // 👉 Agrupar deudas por moneda
+    const deudasPorMoneda: Record<string, DeudaConCliente[]> = {};
+    deudas.forEach(deuda => {
+      const moneda = deuda.moneda || 'ARS';
+      if (!deudasPorMoneda[moneda]) {
+        deudasPorMoneda[moneda] = [];
+      }
+      deudasPorMoneda[moneda].push(deuda);
+    });
+
+    // 👉 Totales por moneda
+    const totalesPorMoneda = Object.entries(deudasPorMoneda).map(
+      ([moneda, deudasMoneda]) => ({
+        moneda,
+        total: deudasMoneda.reduce((s, d) => s + d.monto_total, 0),
+        restante: deudasMoneda.reduce((s, d) => s + d.monto_restante, 0),
+      })
+    );
+
+    const deudasPendientesCliente = deudas.filter(d => d.estado !== 'pagado');
+    const totalDeudas = deudas.length;
+    const deudasPagadas = deudas.filter(d => d.estado === 'pagado').length;
+
+    // 👉 Cliente al día solo si TODAS las monedas están saldadas
+    const clienteAlDia = totalesPorMoneda.every(t => t.restante <= 0);
+
+    return (
+      <Card key={clienteId} className="border-l-4 border-l-blue-500 shadow-sm">
+        <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 flex-1">
+              <div>
+                <h3 className="font-bold text-lg text-gray-900">
+                  {cliente.nombre} {cliente.apellido}
+                </h3>
+                {cliente.telefono && (
+                  <p className="text-xs text-gray-600 mt-0.5">📞 {cliente.telefono}</p>
+                )}
+              </div>
+
+              <Badge
+                className={
+                  clienteAlDia
+                    ? 'text-green-700 bg-green-100'
+                    : 'text-orange-700 bg-orange-100'
+                }
+                variant="outline"
+              >
+                {clienteAlDia ? 'Al día' : 'Pendiente'}
+              </Badge>
+
+              <div className="text-xs text-gray-600">
+                {deudasPagadas}/{totalDeudas} pagadas
+              </div>
+
+              {/* 👉 Totales separados por moneda */}
+              <div className="text-sm space-y-1">
+                {totalesPorMoneda.map(t => (
+                  <div key={t.moneda}>
+                    <span className="text-gray-700 font-semibold">
+                      Total {t.moneda}: ${t.total.toLocaleString()}
+                    </span>
+                    <span
+                      className={
+                        t.restante > 0
+                          ? 'text-red-600 font-semibold ml-3'
+                          : 'text-green-600 ml-3'
+                      }
+                    >
+                      Resta: ${t.restante.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {deudasPendientesCliente.length > 1 && (
+                <PagoCompletoForm
+                  deudas={deudasPendientesCliente}
+                  onPagoCreated={fetchDeudas}
+                />
+              )}
+
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 h-8">
@@ -575,13 +899,25 @@ export function DeudasPage() {
                                   <div key={conceptoBase} className="border-l-2 border-l-orange-300 pl-3 py-1">
                                     <div className="flex items-center justify-between mb-1">
                                       <h4 className="font-semibold text-sm text-gray-800">{conceptoBase}</h4>
-                                      <div className="text-xs text-gray-600">
-                                        <span className="font-medium">${montoTotalConcepto.toLocaleString()}</span>
-                                        {montoRestanteConcepto > 0 && (
-                                          <span className="text-red-600 ml-1">
-                                            (Resta: ${montoRestanteConcepto.toLocaleString()})
-                                          </span>
-                                        )}
+                                      <div className="flex items-center gap-2">
+                                        <div className="text-xs text-gray-600">
+                                          <span className="font-medium">${montoTotalConcepto.toLocaleString()} {deudasConcepto[0]?.moneda || 'ARS'}</span>
+                                          {montoRestanteConcepto > 0 && (
+                                            <span className="text-red-600 ml-1">
+                                              (Resta: ${montoRestanteConcepto.toLocaleString()})
+                                            </span>
+                                          )}
+                                        </div>
+                                        <Button
+                                          onClick={() => handlePrintDeuda(cliente, conceptoBase, deudasConcepto)}
+                                          variant="outline"
+                                          size="sm"
+                                          className="gap-1 h-7 text-xs"
+                                          title="Imprimir esta deuda completa"
+                                        >
+                                          <Printer className="h-3 w-3" />
+                                          Imprimir
+                                        </Button>
                                       </div>
                                     </div>
                                     <div className="space-y-1">

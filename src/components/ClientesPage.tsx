@@ -23,6 +23,15 @@ import { ClienteForm } from "./ClienteForm";
 import { ClienteDeudasDialog } from "./ClienteDeudasDialog";
 import type { Cliente } from "@/types";
 import { CreditCard } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 
 export function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,6 +39,8 @@ export function ClientesPage() {
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [viewingDeudasCliente, setViewingDeudasCliente] = useState<Cliente | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // Clientes por página
   const { toast } = useToast();
 
   useEffect(() => {
@@ -82,12 +93,36 @@ export function ClientesPage() {
     }
   };
 
-  const filteredClientes = clientes.filter(cliente =>
-    cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.telefono?.includes(searchTerm)
-  );
+  const filteredClientes = clientes.filter(cliente => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    const nombreCompleto = `${cliente.nombre} ${cliente.apellido}`.toLowerCase();
+    return (
+      nombreCompleto.includes(searchLower) ||
+      cliente.nombre.toLowerCase().includes(searchLower) ||
+      cliente.apellido.toLowerCase().includes(searchLower) ||
+      cliente.email?.toLowerCase().includes(searchLower) ||
+      cliente.telefono?.includes(searchTerm)
+    );
+  });
+
+  // Ordenar clientes alfabéticamente
+  const clientesOrdenados = [...filteredClientes].sort((a, b) => {
+    const nombreA = `${a.nombre} ${a.apellido}`.toLowerCase();
+    const nombreB = `${b.nombre} ${b.apellido}`.toLowerCase();
+    return nombreA.localeCompare(nombreB);
+  });
+
+  // Calcular paginación
+  const totalPages = Math.ceil(clientesOrdenados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const clientesPaginados = clientesOrdenados.slice(startIndex, endIndex);
+
+  // Resetear a página 1 cuando cambia el término de búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const clientesActivos = clientes.filter(c => c.activo).length;
 
@@ -149,21 +184,28 @@ export function ClientesPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Lista de Clientes ({filteredClientes.length})</CardTitle>
-            <div className="relative">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <CardTitle>
+              Lista de Clientes ({clientesOrdenados.length} {clientesOrdenados.length === 1 ? 'cliente' : 'clientes'})
+              {searchTerm && (
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  - {clientesPaginados.length} mostrados
+                </span>
+              )}
+            </CardTitle>
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Buscar clientes..."
+                placeholder="Buscar por nombre, apellido, email o teléfono..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64"
+                className="pl-10 w-full sm:w-80"
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {filteredClientes.length === 0 ? (
+          {clientesOrdenados.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">
                 {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda' : 'No hay clientes registrados'}
@@ -175,8 +217,9 @@ export function ClientesPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredClientes.map((cliente) => (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {clientesPaginados.map((cliente) => (
                 <Card key={cliente.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -257,7 +300,74 @@ export function ClientesPage() {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (currentPage > 1) setCurrentPage(currentPage - 1);
+                          }}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+                        ) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setCurrentPage(page);
+                                }}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        } else if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                          }}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+              
+              <div className="mt-4 text-center text-sm text-gray-500">
+                Mostrando {startIndex + 1} - {Math.min(endIndex, clientesOrdenados.length)} de {clientesOrdenados.length} clientes
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
