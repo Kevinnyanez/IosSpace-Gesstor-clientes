@@ -69,7 +69,7 @@ export function DeudasPage() {
       const { data: deudasVencidas, error: deudasError } = await supabase
         .from('deudas')
         .select('*')
-        .eq('estado', 'pendiente')
+        .in('estado', ['pendiente', 'vencido'])
         .gt('monto_restante', 0);
 
       if (deudasError) {
@@ -102,27 +102,62 @@ export function DeudasPage() {
       // Obtener configuración
       const { data: config } = await supabase
         .from('configuracion')
-        .select('porcentaje_recargo')
+        .select('porcentaje_recargo, dias_para_recargo')
         .limit(1)
         .maybeSingle();
 
       const porcentajeRecargo = config?.porcentaje_recargo || 10;
+      const diasParaRecargo = config?.dias_para_recargo || 30;
 
       // Aplicar recargos automáticamente
       for (const deuda of deudasParaRecargo) {
-        const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
-        const nuevoMontoTotal = deuda.monto_total + montoRecargo;
+        const fechaVencimiento = new Date(deuda.fecha_vencimiento);
+        fechaVencimiento.setHours(0, 0, 0, 0);
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999);
+        
+        // Calcular días desde el vencimiento
+        const diasVencidos = Math.floor((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Determinar desde cuándo calcular los recargos pendientes
+        let fechaBaseRecargo: Date;
+        if (deuda.fecha_ultimo_recargo) {
+          // Si ya tiene recargo, calcular desde la fecha del último recargo
+          fechaBaseRecargo = new Date(deuda.fecha_ultimo_recargo);
+          fechaBaseRecargo.setHours(0, 0, 0, 0);
+        } else {
+          // Si no tiene recargo, calcular desde la fecha de vencimiento
+          fechaBaseRecargo = new Date(fechaVencimiento);
+        }
+        
+        // Calcular cuántos períodos de recargo han pasado
+        const diasDesdeBase = Math.floor((hoy.getTime() - fechaBaseRecargo.getTime()) / (1000 * 60 * 60 * 24));
+        const periodosRecargo = Math.floor(diasDesdeBase / diasParaRecargo);
+        
+        // Aplicar recargos acumulativos por cada período
+        let montoTotalRecargos = 0;
+        let montoActual = deuda.monto_restante;
+        
+        for (let i = 0; i < periodosRecargo; i++) {
+          const montoRecargoPeriodo = Math.round((montoActual * porcentajeRecargo) / 100);
+          montoTotalRecargos += montoRecargoPeriodo;
+          montoActual += montoRecargoPeriodo; // El siguiente recargo se calcula sobre el monto ya incrementado
+        }
+        
+        if (montoTotalRecargos > 0) {
+          const nuevoMontoTotal = deuda.monto_total + montoTotalRecargos;
 
-        // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
-        await supabase
-          .from('deudas')
-          .update({
-            recargos: deuda.recargos + montoRecargo,
-            monto_total: nuevoMontoTotal,
-            estado: 'vencido',
-            fecha_ultimo_recargo: new Date().toISOString()
-          })
-          .eq('id', deuda.id);
+          // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
+          await supabase
+            .from('deudas')
+            .update({
+              recargos: deuda.recargos + montoTotalRecargos,
+              monto_total: nuevoMontoTotal,
+              estado: 'vencido',
+              fecha_ultimo_recargo: new Date().toISOString()
+            })
+            .eq('id', deuda.id);
+        }
       }
       
       console.log('Recargos automáticos aplicados al cargar la página');

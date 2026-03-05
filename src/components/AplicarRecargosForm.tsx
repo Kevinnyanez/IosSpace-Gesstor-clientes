@@ -54,10 +54,10 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       hoy: hoy.toISOString(),
       estaVencida,
       tieneRecargoReciente,
-      puedeRecargo: deuda.estado === 'pendiente' && deuda.monto_restante > 0 && estaVencida && !tieneRecargoReciente
+      puedeRecargo: (deuda.estado === 'pendiente' || deuda.estado === 'vencido') && deuda.monto_restante > 0 && estaVencida && !tieneRecargoReciente
     });
     
-    return deuda.estado === 'pendiente' && 
+    return (deuda.estado === 'pendiente' || deuda.estado === 'vencido') && 
            deuda.monto_restante > 0 && 
            estaVencida &&
            !tieneRecargoReciente;
@@ -74,7 +74,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       // Obtener configuración
       const { data: config, error: configError } = await supabase
         .from('configuracion')
-        .select('porcentaje_recargo')
+        .select('porcentaje_recargo, dias_para_recargo')
         .limit(1)
         .maybeSingle();
 
@@ -84,38 +84,71 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
       }
 
       const porcentajeRecargo = config?.porcentaje_recargo || 10;
-      console.log('Porcentaje de recargo:', porcentajeRecargo);
+      const diasParaRecargo = config?.dias_para_recargo || 30;
+      console.log('Porcentaje de recargo:', porcentajeRecargo, 'Días para recargo:', diasParaRecargo);
 
       // Aplicar recargos individualmente
       let recargosAplicados = 0;
       for (const deuda of deudasVencidas) {
-        const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
-        const nuevoMontoTotal = deuda.monto_total + montoRecargo;
+        const fechaVencimiento = new Date(deuda.fecha_vencimiento);
+        fechaVencimiento.setHours(0, 0, 0, 0);
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999);
         
-        console.log(`Aplicando recargo a deuda ${deuda.id}:`, {
-          montoOriginal: deuda.monto_total,
-          montoRestante: deuda.monto_restante,
-          recargo: montoRecargo,
-          nuevoTotal: nuevoMontoTotal
-        });
-
-        // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
-        const { error } = await supabase
-          .from('deudas')
-          .update({
-            recargos: deuda.recargos + montoRecargo,
-            monto_total: nuevoMontoTotal,
-            estado: 'vencido',
-            fecha_ultimo_recargo: new Date().toISOString()
-          })
-          .eq('id', deuda.id);
-
-        if (error) {
-          console.error('Error actualizando deuda:', error);
-          throw error;
+        // Determinar desde cuándo calcular los recargos pendientes
+        let fechaBaseRecargo: Date;
+        if (deuda.fecha_ultimo_recargo) {
+          // Si ya tiene recargo, calcular desde la fecha del último recargo
+          fechaBaseRecargo = new Date(deuda.fecha_ultimo_recargo);
+          fechaBaseRecargo.setHours(0, 0, 0, 0);
+        } else {
+          // Si no tiene recargo, calcular desde la fecha de vencimiento
+          fechaBaseRecargo = new Date(fechaVencimiento);
         }
         
-        recargosAplicados++;
+        // Calcular cuántos períodos de recargo han pasado
+        const diasDesdeBase = Math.floor((hoy.getTime() - fechaBaseRecargo.getTime()) / (1000 * 60 * 60 * 24));
+        const periodosRecargo = Math.floor(diasDesdeBase / diasParaRecargo);
+        
+        // Aplicar recargos acumulativos por cada período
+        let montoTotalRecargos = 0;
+        let montoActual = deuda.monto_restante;
+        
+        for (let i = 0; i < periodosRecargo; i++) {
+          const montoRecargoPeriodo = Math.round((montoActual * porcentajeRecargo) / 100);
+          montoTotalRecargos += montoRecargoPeriodo;
+          montoActual += montoRecargoPeriodo; // El siguiente recargo se calcula sobre el monto ya incrementado
+        }
+        
+        if (montoTotalRecargos > 0) {
+          const nuevoMontoTotal = deuda.monto_total + montoTotalRecargos;
+          
+          console.log(`Aplicando recargo a deuda ${deuda.id}:`, {
+            montoOriginal: deuda.monto_total,
+            montoRestante: deuda.monto_restante,
+            periodosRecargo,
+            recargoTotal: montoTotalRecargos,
+            nuevoTotal: nuevoMontoTotal
+          });
+
+          // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
+          const { error } = await supabase
+            .from('deudas')
+            .update({
+              recargos: deuda.recargos + montoTotalRecargos,
+              monto_total: nuevoMontoTotal,
+              estado: 'vencido',
+              fecha_ultimo_recargo: new Date().toISOString()
+            })
+            .eq('id', deuda.id);
+
+          if (error) {
+            console.error('Error actualizando deuda:', error);
+            throw error;
+          }
+          
+          recargosAplicados++;
+        }
       }
       
       toast({
