@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X, Printer } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X, Printer, ChevronDown } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   AlertDialog,
@@ -25,6 +25,7 @@ import { PagoCompletoForm } from "./PagoCompletoForm";
 import { AplicarRecargosForm } from "./AplicarRecargosForm";
 import { HistorialPagos } from "./HistorialPagos";
 import { MONEDAS, type DeudaConCliente } from "@/types";
+import { calcularRecargoPorDiasYMeses, calcularRecargoConDesglose, getPorcentajesRecargo, calcularRecargoSimpleDiario } from "@/lib/recargos";
 import {
   Pagination,
   PaginationContent,
@@ -34,6 +35,13 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export function DeudasPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,6 +49,7 @@ export function DeudasPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('deudas');
   const [currentPage, setCurrentPage] = useState(1);
+  const [detalleRecargoModalDeuda, setDetalleRecargoModalDeuda] = useState<DeudaConCliente | null>(null);
   const itemsPerPage = 10; // Clientes por página
   const [stats, setStats] = useState({
     totalAdeudadoARS: 0,
@@ -77,21 +86,22 @@ export function DeudasPage() {
         return;
       }
 
-      // Filtrar las que están vencidas desde hoy y no tienen recargo reciente
+      // Filtrar las que están vencidas; no aplicar si ya se aplicó recargo hoy (evitar duplicar)
       const hoy = new Date();
-      hoy.setHours(23, 59, 59, 999); // Incluir todo el día de hoy
-      
+      hoy.setHours(23, 59, 59, 999);
+      const hoyInicio = new Date(hoy);
+      hoyInicio.setHours(0, 0, 0, 0);
+
       const deudasParaRecargo = deudasVencidas?.filter(deuda => {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
         fechaVencimiento.setHours(0, 0, 0, 0);
-        
-        // Verificar si ya tiene recargo reciente (menos de 30 días)
-        const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
-          new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        
         const estaVencida = fechaVencimiento <= hoy;
-        
-        return estaVencida && !tieneRecargoReciente;
+        const yaAplicadoHoy = deuda.fecha_ultimo_recargo && (() => {
+          const ultimo = new Date(deuda.fecha_ultimo_recargo);
+          ultimo.setHours(0, 0, 0, 0);
+          return ultimo.getTime() >= hoyInicio.getTime();
+        })();
+        return estaVencida && !yaAplicadoHoy;
       }) || [];
 
       if (deudasParaRecargo.length === 0) {
@@ -99,55 +109,32 @@ export function DeudasPage() {
         return;
       }
 
-      // Obtener configuración
-      const { data: config } = await supabase
-        .from('configuracion')
-        .select('porcentaje_recargo, dias_para_recargo')
-        .limit(1)
-        .maybeSingle();
-
-      const porcentajeRecargo = config?.porcentaje_recargo || 10;
-      const diasParaRecargo = config?.dias_para_recargo || 30;
-
-      // Aplicar recargos automáticamente
+      // Aplicar recargos: 0,5% por día + 10% cada 30 días desde el vencimiento
       for (const deuda of deudasParaRecargo) {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
         fechaVencimiento.setHours(0, 0, 0, 0);
-        const hoy = new Date();
-        hoy.setHours(23, 59, 59, 999);
-        
-        // Calcular días desde el vencimiento
-        const diasVencidos = Math.floor((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24));
-        
-        // Determinar desde cuándo calcular los recargos pendientes
-        let fechaBaseRecargo: Date;
+        const hasta = new Date();
+        hasta.setHours(23, 59, 59, 999);
+
+        let fechaDesde: Date;
         if (deuda.fecha_ultimo_recargo) {
-          // Si ya tiene recargo, calcular desde la fecha del último recargo
-          fechaBaseRecargo = new Date(deuda.fecha_ultimo_recargo);
-          fechaBaseRecargo.setHours(0, 0, 0, 0);
+          fechaDesde = new Date(deuda.fecha_ultimo_recargo);
+          fechaDesde.setHours(0, 0, 0, 0);
+          fechaDesde.setDate(fechaDesde.getDate() + 1);
         } else {
-          // Si no tiene recargo, calcular desde la fecha de vencimiento
-          fechaBaseRecargo = new Date(fechaVencimiento);
+          fechaDesde = new Date(fechaVencimiento);
         }
-        
-        // Calcular cuántos períodos de recargo han pasado
-        const diasDesdeBase = Math.floor((hoy.getTime() - fechaBaseRecargo.getTime()) / (1000 * 60 * 60 * 24));
-        const periodosRecargo = Math.floor(diasDesdeBase / diasParaRecargo);
-        
-        // Aplicar recargos acumulativos por cada período
-        let montoTotalRecargos = 0;
-        let montoActual = deuda.monto_restante;
-        
-        for (let i = 0; i < periodosRecargo; i++) {
-          const montoRecargoPeriodo = Math.round((montoActual * porcentajeRecargo) / 100);
-          montoTotalRecargos += montoRecargoPeriodo;
-          montoActual += montoRecargoPeriodo; // El siguiente recargo se calcula sobre el monto ya incrementado
-        }
-        
+
+        // Recargo sobre lo que aún debe (monto_restante), no sobre el total; así se tiene en cuenta si abonó
+        const baseParaRecargo = deuda.monto_restante ?? deuda.monto_total;
+        const montoTotalRecargos = calcularRecargoPorDiasYMeses(
+          baseParaRecargo,
+          fechaDesde,
+          hasta
+        );
+
         if (montoTotalRecargos > 0) {
           const nuevoMontoTotal = deuda.monto_total + montoTotalRecargos;
-
-          // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
           await supabase
             .from('deudas')
             .update({
@@ -956,36 +943,72 @@ export function DeudasPage() {
                                       </div>
                                     </div>
                                     <div className="space-y-1">
-                                      {deudasConcepto.map((deuda, index) => (
-                                        <div key={deuda.id} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded text-xs">
-                                          <div className="flex items-center gap-2 flex-1">
-                                            <span className="w-5 h-5 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-semibold">
-                                              {index + 1}
-                                            </span>
-                                            <span className="font-medium text-gray-900">
-                                              ${deuda.monto_total.toLocaleString()}
+                                      {deudasConcepto.map((deuda, index) => {
+                                        const simb = MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo ?? '$';
+                                        const montoOriginal = deuda.monto_total - deuda.recargos;
+                                        const totalCalculado = montoOriginal + deuda.recargos;
+                                        const restaCalculada = deuda.monto_total - deuda.monto_abonado;
+                                        return (
+                                        <div key={deuda.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-xs gap-3">
+                                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className="w-5 h-5 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-semibold shrink-0">
+                                                {index + 1}
+                                              </span>
+                                              <span className="text-gray-500 shrink-0">
+                                                <Calendar className="h-3 w-3 inline mr-0.5" />
+                                                Vence: {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                              </span>
+                                              <Badge 
+                                                className={`${getEstadoBadge(deuda.estado).color} text-xs px-1.5 py-0 shrink-0`}
+                                                variant="outline"
+                                              >
+                                                {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
+                                              </Badge>
+                                            </div>
+                                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+                                              <span className="text-gray-600" title="Monto original de la deuda (sin recargos)">
+                                                Precio: <strong className="text-gray-900">{simb}{montoOriginal.toLocaleString()}</strong>
+                                              </span>
                                               {deuda.recargos > 0 && (
-                                                <span className="text-orange-600 ml-1">
-                                                  (+${deuda.recargos.toLocaleString()})
-                                                </span>
+                                                <>
+                                                  <span className="text-gray-400">+</span>
+                                                  <span className="text-orange-600 font-medium" title="Recargo por mora (0,5% por día + 10% cada 30 días)">
+                                                    Recargo: {simb}{deuda.recargos.toLocaleString()}
+                                                  </span>
+                                                  <span className="text-gray-400">=</span>
+                                                </>
                                               )}
-                                            </span>
-                                            <span className="text-gray-500">
-                                              <Calendar className="h-3 w-3 inline mr-0.5" />
-                                              {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
-                                            </span>
-                                            <span className="text-gray-500">
-                                              Abonado: ${deuda.monto_abonado.toLocaleString()}
-                                            </span>
-                                            <span className={deuda.monto_restante > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>
-                                              Resta: ${deuda.monto_restante.toLocaleString()}
-                                            </span>
-                                            <Badge 
-                                              className={`${getEstadoBadge(deuda.estado).color} text-xs px-1.5 py-0`}
-                                              variant="outline"
-                                            >
-                                              {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
-                                            </Badge>
+                                              <span className="text-gray-800 font-semibold">
+                                                Total: {simb}{deuda.monto_total.toLocaleString()}
+                                              </span>
+                                              {(deuda.monto_abonado > 0 || deuda.monto_restante !== deuda.monto_total) && (
+                                                <>
+                                                  <span className="text-gray-400">−</span>
+                                                  <span className="text-blue-600">
+                                                    Abonado: {simb}{deuda.monto_abonado.toLocaleString()}
+                                                  </span>
+                                                  <span className="text-gray-400">=</span>
+                                                </>
+                                              )}
+                                              <span className={deuda.monto_restante > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-medium'}>
+                                                Resta: {simb}{(deuda.monto_restante ?? 0).toLocaleString()}
+                                              </span>
+                                            </div>
+                                            {(Math.abs(totalCalculado - deuda.monto_total) > 1 || Math.abs(restaCalculada - (deuda.monto_restante ?? 0)) > 1) && (
+                                              <p className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                                Verificar: Precio + Recargo debe ser Total; Total − Abonado = Resta
+                                              </p>
+                                            )}
+                                            {deuda.recargos > 0 && (
+                                                <Button
+                                                  variant="link"
+                                                  className="h-auto p-0 text-[11px] text-blue-600 hover:text-blue-800 font-medium"
+                                                  onClick={() => setDetalleRecargoModalDeuda(deuda)}
+                                                >
+                                                  Ver detalles de recargo
+                                                </Button>
+                                            )}
                                           </div>
                                           <div className="flex items-center gap-1">
                                             {deuda.estado !== 'pagado' && (
@@ -1017,7 +1040,8 @@ export function DeudasPage() {
                                             </AlertDialog>
                                           </div>
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 );
@@ -1105,6 +1129,76 @@ export function DeudasPage() {
           <HistorialPagos />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!detalleRecargoModalDeuda} onOpenChange={(open) => !open && setDetalleRecargoModalDeuda(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalles de recargo</DialogTitle>
+            <DialogDescription>
+              Desglose del recargo. Por defecto se cobra el <strong>recargo acumulado</strong>. Aquí puedes ver también el recargo simple por si quieres cobrar ese monto.
+            </DialogDescription>
+          </DialogHeader>
+          {detalleRecargoModalDeuda && (() => {
+            const deuda = detalleRecargoModalDeuda;
+            const simb = MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo ?? '$';
+            const montoOriginal = deuda.monto_total - deuda.recargos;
+            const fechaVenc = new Date(deuda.fecha_vencimiento);
+            fechaVenc.setHours(0, 0, 0, 0);
+            const hasta = new Date();
+            hasta.setHours(23, 59, 59, 999);
+            const desglose = calcularRecargoConDesglose(montoOriginal, fechaVenc, hasta);
+            const porc = getPorcentajesRecargo();
+            const recargoSimple = calcularRecargoSimpleDiario(montoOriginal, desglose.diasVencidos);
+            return (
+              <div className="space-y-4 text-sm">
+                <div className="rounded-lg border p-3 space-y-2 bg-gray-50">
+                  <p className="font-semibold text-gray-800">Recargo acumulado (por defecto)</p>
+                  <p className="text-gray-600">{desglose.diasVencidos} días vencidos</p>
+                  <div className="space-y-1">
+                    <p>
+                      <span className="text-gray-600">Por días (0,5% acumulado por día):</span>{' '}
+                      <strong>{simb}{desglose.recargoPorDias.toLocaleString()}</strong>
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Por vencimiento (10% cada 30 días):</span>{' '}
+                      <strong className="text-orange-600">{simb}{desglose.recargoPor30Dias.toLocaleString()}</strong>
+                    </p>
+                    {desglose.detallePor30Dias.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-gray-600 mb-1">Cada aplicación del 10%:</p>
+                        <ul className="list-disc list-inside space-y-0.5 pl-1 text-gray-700">
+                          {desglose.detallePor30Dias.map((d) => (
+                            <li key={d.periodo}>
+                              Período {d.periodo} (día {d.diaDesdeInicio}): {simb}{d.montoRecargo.toLocaleString()}
+                              {' '}
+                              <span className="text-gray-500">({new Date(d.fechaAplicacion).toLocaleDateString('es-AR')})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="pt-2 border-t border-gray-200 mt-2 font-medium">
+                      Total recargo acumulado: <strong>{simb}{desglose.total.toLocaleString()}</strong>
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-dashed p-3 space-y-1 bg-blue-50/50">
+                  <p className="font-semibold text-gray-800">Recargo simple (referencia)</p>
+                  <p className="text-gray-600">
+                    0,5% del precio × {desglose.diasVencidos} días = {simb}{montoOriginal.toLocaleString()} × {porc.diario}% × {desglose.diasVencidos}
+                  </p>
+                  <p className="font-medium">
+                    Total recargo simple: <strong>{simb}{recargoSimple.toLocaleString()}</strong>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si quieres cobrar este monto en lugar del acumulado, puedes anotarlo o ajustar la deuda manualmente.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

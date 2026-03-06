@@ -24,6 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MONEDAS, type DeudaConCliente } from "@/types";
+import { calcularRecargoPorDiasYMeses } from "@/lib/recargos";
 
 interface AplicarRecargosFormProps {
   deudas: DeudaConCliente[];
@@ -35,103 +36,65 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Filtrar deudas que pueden recibir recargo (vencidas desde hoy y sin recargo aplicado recientemente)
+  // Filtrar deudas vencidas que pueden recibir recargo (no aplicado hoy para no duplicar)
+  const hoy = new Date();
+  hoy.setHours(23, 59, 59, 999);
+  const hoyInicio = new Date(hoy);
+  hoyInicio.setHours(0, 0, 0, 0);
+
   const deudasVencidas = deudas.filter(deuda => {
     const fechaVencimiento = new Date(deuda.fecha_vencimiento);
-    const hoy = new Date();
-    hoy.setHours(23, 59, 59, 999); // Incluir todo el día de hoy
     fechaVencimiento.setHours(0, 0, 0, 0);
-    
-    // Verificar si ya tiene recargo reciente (menos de 30 días)
-    const tieneRecargoReciente = deuda.fecha_ultimo_recargo && 
-      new Date(deuda.fecha_ultimo_recargo) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
-    // Permitir recargo desde el mismo día de vencimiento
     const estaVencida = fechaVencimiento <= hoy;
-    
-    console.log(`Deuda ${deuda.id}:`, {
-      fechaVencimiento: fechaVencimiento.toISOString(),
-      hoy: hoy.toISOString(),
-      estaVencida,
-      tieneRecargoReciente,
-      puedeRecargo: (deuda.estado === 'pendiente' || deuda.estado === 'vencido') && deuda.monto_restante > 0 && estaVencida && !tieneRecargoReciente
-    });
-    
-    return (deuda.estado === 'pendiente' || deuda.estado === 'vencido') && 
-           deuda.monto_restante > 0 && 
+    const yaAplicadoHoy = deuda.fecha_ultimo_recargo && (() => {
+      const ultimo = new Date(deuda.fecha_ultimo_recargo);
+      ultimo.setHours(0, 0, 0, 0);
+      return ultimo.getTime() >= hoyInicio.getTime();
+    })();
+    return (deuda.estado === 'pendiente' || deuda.estado === 'vencido') &&
+           deuda.monto_restante > 0 &&
            estaVencida &&
-           !tieneRecargoReciente;
+           !yaAplicadoHoy;
   });
-
-  console.log('Deudas vencidas encontradas:', deudasVencidas.length);
-  console.log('Deudas vencidas:', deudasVencidas);
 
   const aplicarRecargosAutomaticos = async () => {
     setLoading(true);
     try {
-      console.log('Aplicando recargos automáticos a', deudasVencidas.length, 'deudas');
-      
-      // Obtener configuración
-      const { data: config, error: configError } = await supabase
-        .from('configuracion')
-        .select('porcentaje_recargo, dias_para_recargo')
-        .limit(1)
-        .maybeSingle();
+      console.log('Aplicando recargos automáticos (0,5% por día + 10% cada 30 días) a', deudasVencidas.length, 'deudas');
 
-      if (configError) {
-        console.error('Error obteniendo configuración:', configError);
-        throw new Error('No se pudo obtener la configuración de recargos');
-      }
-
-      const porcentajeRecargo = config?.porcentaje_recargo || 10;
-      const diasParaRecargo = config?.dias_para_recargo || 30;
-      console.log('Porcentaje de recargo:', porcentajeRecargo, 'Días para recargo:', diasParaRecargo);
-
-      // Aplicar recargos individualmente
       let recargosAplicados = 0;
+      const hasta = new Date();
+      hasta.setHours(23, 59, 59, 999);
+
       for (const deuda of deudasVencidas) {
         const fechaVencimiento = new Date(deuda.fecha_vencimiento);
         fechaVencimiento.setHours(0, 0, 0, 0);
-        const hoy = new Date();
-        hoy.setHours(23, 59, 59, 999);
-        
-        // Determinar desde cuándo calcular los recargos pendientes
-        let fechaBaseRecargo: Date;
+
+        let fechaDesde: Date;
         if (deuda.fecha_ultimo_recargo) {
-          // Si ya tiene recargo, calcular desde la fecha del último recargo
-          fechaBaseRecargo = new Date(deuda.fecha_ultimo_recargo);
-          fechaBaseRecargo.setHours(0, 0, 0, 0);
+          fechaDesde = new Date(deuda.fecha_ultimo_recargo);
+          fechaDesde.setHours(0, 0, 0, 0);
+          fechaDesde.setDate(fechaDesde.getDate() + 1);
         } else {
-          // Si no tiene recargo, calcular desde la fecha de vencimiento
-          fechaBaseRecargo = new Date(fechaVencimiento);
+          fechaDesde = new Date(fechaVencimiento);
         }
-        
-        // Calcular cuántos períodos de recargo han pasado
-        const diasDesdeBase = Math.floor((hoy.getTime() - fechaBaseRecargo.getTime()) / (1000 * 60 * 60 * 24));
-        const periodosRecargo = Math.floor(diasDesdeBase / diasParaRecargo);
-        
-        // Aplicar recargos acumulativos por cada período
-        let montoTotalRecargos = 0;
-        let montoActual = deuda.monto_restante;
-        
-        for (let i = 0; i < periodosRecargo; i++) {
-          const montoRecargoPeriodo = Math.round((montoActual * porcentajeRecargo) / 100);
-          montoTotalRecargos += montoRecargoPeriodo;
-          montoActual += montoRecargoPeriodo; // El siguiente recargo se calcula sobre el monto ya incrementado
-        }
-        
+
+        // Recargo sobre lo que aún debe (monto_restante), para tener en cuenta abonos
+        const baseParaRecargo = deuda.monto_restante ?? deuda.monto_total;
+        const montoTotalRecargos = calcularRecargoPorDiasYMeses(
+          baseParaRecargo,
+          fechaDesde,
+          hasta
+        );
+
         if (montoTotalRecargos > 0) {
           const nuevoMontoTotal = deuda.monto_total + montoTotalRecargos;
-          
           console.log(`Aplicando recargo a deuda ${deuda.id}:`, {
-            montoOriginal: deuda.monto_total,
-            montoRestante: deuda.monto_restante,
-            periodosRecargo,
+            montoActual: deuda.monto_total,
             recargoTotal: montoTotalRecargos,
             nuevoTotal: nuevoMontoTotal
           });
 
-          // Solo actualizar campos que se pueden modificar, monto_restante se calcula automáticamente
           const { error } = await supabase
             .from('deudas')
             .update({
@@ -146,7 +109,6 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
             console.error('Error actualizando deuda:', error);
             throw error;
           }
-          
           recargosAplicados++;
         }
       }
@@ -233,7 +195,7 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
             Aplicar Recargos a Deudas Vencidas
           </DialogTitle>
           <DialogDescription>
-            Se encontraron {deudasVencidas.length} deudas vencidas sin recargo aplicado recientemente
+            Se encontraron {deudasVencidas.length} deudas vencidas. Recargo: 0,5% por día + 10% cada 30 días desde el vencimiento.
           </DialogDescription>
         </DialogHeader>
         
@@ -278,16 +240,24 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900">Deudas Vencidas Sin Recargo Reciente</h3>
+            <h3 className="font-semibold text-gray-900">Deudas vencidas (recargo 0,5% por día + 10% cada 30 días)</h3>
             <div className="max-h-96 overflow-y-auto space-y-2">
               {deudasVencidas.map((deuda) => {
                 const fechaVencimiento = new Date(deuda.fecha_vencimiento);
-                const hoy = new Date();
-                const diasVencido = Math.max(0, Math.ceil((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24)));
-                
-                // Obtener porcentaje de recargo por defecto
-                const porcentajeRecargo = 10; // Este valor se obtendría de la configuración
-                const montoRecargo = Math.round((deuda.monto_restante * porcentajeRecargo) / 100);
+                fechaVencimiento.setHours(0, 0, 0, 0);
+                const hasta = new Date();
+                hasta.setHours(23, 59, 59, 999);
+                let fechaDesde: Date;
+                if (deuda.fecha_ultimo_recargo) {
+                  fechaDesde = new Date(deuda.fecha_ultimo_recargo);
+                  fechaDesde.setHours(0, 0, 0, 0);
+                  fechaDesde.setDate(fechaDesde.getDate() + 1);
+                } else {
+                  fechaDesde = new Date(fechaVencimiento);
+                }
+                const baseParaRecargo = deuda.monto_restante ?? deuda.monto_total;
+                const montoRecargo = calcularRecargoPorDiasYMeses(baseParaRecargo, fechaDesde, hasta);
+                const diasVencido = Math.max(0, Math.ceil((hasta.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24)));
 
                 return (
                   <div key={deuda.id} className="flex items-center justify-between p-3 border rounded-lg bg-white">

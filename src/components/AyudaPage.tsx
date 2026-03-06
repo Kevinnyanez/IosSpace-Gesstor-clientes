@@ -33,7 +33,7 @@ export function AyudaPage() {
               />
             </div>
             <div className="text-center md:text-left">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">IoSpace Control</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">IosSpace Control</h3>
               <p className="text-gray-700 text-sm leading-relaxed">
                 Una aplicación web integral diseñada para la gestión eficiente de clientes, deudas, pagos e inventario. 
                 Automatiza procesos financieros y proporciona herramientas completas para el control administrativo empresarial.
