@@ -252,17 +252,18 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-orange-600 hover:bg-orange-700">
+        <Button className="bg-blue-600 hover:bg-blue-700 shadow-sm">
           <Plus className="h-4 w-4 mr-2" />
           Nueva Deuda
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Agregar Deuda</DialogTitle>
+        <DialogHeader className="pb-1">
+          <DialogTitle className="text-lg font-semibold text-gray-900">Nueva Deuda</DialogTitle>
+          <p className="text-sm text-gray-500">Registra una nueva deuda para un cliente</p>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
             <FormField
               control={form.control}
               name="cliente_id"
@@ -270,7 +271,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 const clienteSeleccionado = clientes.find((c) => c.id === field.value);
                 return (
                   <FormItem>
-                    <FormLabel>Cliente *</FormLabel>
+                    <FormLabel className="text-xs font-medium text-gray-600">Cliente *</FormLabel>
                     <Popover open={clienteComboboxOpen} onOpenChange={setClienteComboboxOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -330,7 +331,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               name="concepto"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Concepto/Producto *</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Concepto/Producto *</FormLabel>
                   <FormControl>
                     <Input placeholder="Descripción del producto o servicio" {...field} />
                   </FormControl>
@@ -345,7 +346,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="monto_total"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Monto Total *</FormLabel>
+                    <FormLabel className="text-xs font-medium text-gray-600">Monto Total *</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -365,7 +366,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="monto_abonado"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Abono Inicial</FormLabel>
+                    <FormLabel className="text-xs font-medium text-gray-600">Abono Inicial</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -385,7 +386,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="moneda"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Moneda *</FormLabel>
+                    <FormLabel className="text-xs font-medium text-gray-600">Moneda *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -412,7 +413,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="cuotas"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cantidad de Cuotas</FormLabel>
+                    <FormLabel className="text-xs font-medium text-gray-600">Cuotas</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -432,7 +433,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
                 name="fecha_vencimiento"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Primera Cuota Vence *</FormLabel>
+                    <FormLabel className="text-xs font-medium text-gray-600">Vencimiento *</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -474,7 +475,7 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               name="notas"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notas</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Notas</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Notas adicionales..." {...field} />
                   </FormControl>
@@ -483,11 +484,11 @@ export function DeudaForm({ onDeudaCreated }: DeudaFormProps) {
               )}
             />
             
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="text-gray-500">
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
                 {loading ? "Creando..." : "Crear Deuda"}
               </Button>
             </div>

@@ -29,8 +29,7 @@ import type { Cliente } from "@/types";
 const clienteFormSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   apellido: z.string().min(1, "El apellido es obligatorio"),
-  telefono: z.string().min(1, "El teléfono es obligatorio"),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  telefono: z.string().optional(),
   direccion: z.string().optional(),
 });
 
@@ -52,7 +51,6 @@ export function ClienteForm({ onClienteCreated, cliente, onClose }: ClienteFormP
       nombre: cliente?.nombre || "",
       apellido: cliente?.apellido || "",
       telefono: cliente?.telefono || "",
-      email: cliente?.email || "",
       direccion: cliente?.direccion || "",
     },
   });
@@ -64,7 +62,6 @@ export function ClienteForm({ onClienteCreated, cliente, onClose }: ClienteFormP
         nombre: cliente.nombre,
         apellido: cliente.apellido,
         telefono: cliente.telefono || "",
-        email: cliente.email || "",
         direccion: cliente.direccion || "",
       });
     }
@@ -79,8 +76,7 @@ export function ClienteForm({ onClienteCreated, cliente, onClose }: ClienteFormP
           .update({
             nombre: data.nombre,
             apellido: data.apellido,
-            telefono: data.telefono,
-            email: data.email || null,
+            telefono: data.telefono || null,
             direccion: data.direccion || null,
           })
           .eq('id', cliente.id);
@@ -98,8 +94,7 @@ export function ClienteForm({ onClienteCreated, cliente, onClose }: ClienteFormP
           .insert([{
             nombre: data.nombre,
             apellido: data.apellido,
-            telefono: data.telefono,
-            email: data.email || null,
+            telefono: data.telefono || null,
             direccion: data.direccion || null,
           }]);
 
@@ -134,68 +129,58 @@ export function ClienteForm({ onClienteCreated, cliente, onClose }: ClienteFormP
     <Dialog open={open} onOpenChange={cliente ? handleClose : setOpen}>
       {!cliente && (
         <DialogTrigger asChild>
-          <Button className="bg-blue-600 hover:bg-blue-700">
+          <Button className="bg-blue-600 hover:bg-blue-700 shadow-sm">
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Cliente
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{cliente ? "Editar Cliente" : "Agregar Cliente"}</DialogTitle>
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader className="pb-1">
+          <DialogTitle className="text-lg font-semibold text-gray-900">
+            {cliente ? "Editar Cliente" : "Nuevo Cliente"}
+          </DialogTitle>
+          <p className="text-sm text-gray-500">{cliente ? "Modifica los datos del cliente" : "Completa los datos para registrar un cliente"}</p>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nombre del cliente" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="apellido"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Apellido *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Apellido del cliente" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="nombre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium text-gray-600">Nombre *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nombre" className="h-9" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="apellido"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium text-gray-600">Apellido *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Apellido" className="h-9" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <FormField
               control={form.control}
               name="telefono"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Teléfono *</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Teléfono</FormLabel>
                   <FormControl>
-                    <Input placeholder="Número de teléfono" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="email@ejemplo.com" {...field} />
+                    <Input placeholder="011 1234-5678" className="h-9" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -207,21 +192,21 @@ export function ClienteForm({ onClienteCreated, cliente, onClose }: ClienteFormP
               name="direccion"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Dirección</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Dirección</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Dirección del cliente" {...field} />
+                    <Textarea placeholder="Dirección del cliente" className="resize-none h-16" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={handleClose}>
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <Button type="button" variant="ghost" onClick={handleClose} className="text-gray-500">
                 Cancelar
               </Button>
-              <Button type="submit">
-                {cliente ? "Actualizar Cliente" : "Crear Cliente"}
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 shadow-sm">
+                {cliente ? "Guardar cambios" : "Crear Cliente"}
               </Button>
             </div>
           </form>

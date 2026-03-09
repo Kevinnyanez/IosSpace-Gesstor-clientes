@@ -10,9 +10,9 @@ import { ClientesPage } from "./components/ClientesPage";
 import { DeudasPage } from "./components/DeudasPage";
 import { CalendarioPage } from "./components/CalendarioPage";
 import { InventarioPage } from "./components/InventarioPage";
-import { AyudaPage } from "./components/AyudaPage";
 import { ConfiguracionPage } from "./components/ConfiguracionPage";
 import { ChatPage } from "./components/ChatPage";
+import { NotificacionesPage } from "./components/NotificacionesPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -44,9 +44,9 @@ function AppContent() {
         <Route path="/deudas" element={<DeudasPage />} />
         <Route path="/calendario" element={<CalendarioPage />} />
         <Route path="/inventario" element={<InventarioPage />} />
-        <Route path="/ayuda" element={<AyudaPage />} />
         <Route path="/configuracion" element={<ConfiguracionPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/notificaciones" element={<NotificacionesPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

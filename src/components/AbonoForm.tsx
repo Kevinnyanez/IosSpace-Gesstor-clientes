@@ -132,33 +132,41 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <CreditCard className="h-4 w-4 mr-1" />
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-500 hover:text-blue-600">
+          <CreditCard className="h-3 w-3 mr-1" />
           Abonar
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>Registrar Abono</DialogTitle>
-          <div className="text-sm text-gray-600">
-            <p><strong>Cliente:</strong> {deuda.cliente.nombre} {deuda.cliente.apellido}</p>
-            <p><strong>Concepto:</strong> {deuda.concepto}</p>
-            <p><strong>Saldo restante:</strong> {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{deuda.monto_restante.toLocaleString()} {deuda.moneda}</p>
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <CreditCard className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-base">Registrar Abono</DialogTitle>
+              <p className="text-xs text-gray-400 mt-0.5">{deuda.cliente.nombre} {deuda.cliente.apellido} — {deuda.concepto}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+            <span className="text-xs text-gray-500">Saldo restante</span>
+            <span className="text-sm font-semibold text-gray-900">{MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{deuda.monto_restante.toLocaleString()} {deuda.moneda}</span>
           </div>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
             <FormField
               control={form.control}
               name="monto"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto del Abono ({deuda.moneda}) *</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Monto ({deuda.moneda}) *</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
                       step="0.01"
                       placeholder="0.00"
+                      className="h-9"
                       {...field}
                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                     />
@@ -173,14 +181,14 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
               name="fecha_pago"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Fecha de Pago *</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Fecha de Pago *</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
                           variant={"outline"}
                           className={cn(
-                            "w-full pl-3 text-left font-normal",
+                            "w-full pl-3 text-left font-normal h-9",
                             !field.value && "text-muted-foreground"
                           )}
                         >
@@ -208,11 +216,11 @@ export function AbonoForm({ deuda, onAbonoCreated }: AbonoFormProps) {
               )}
             />
             
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="text-gray-500">
                 Cancelar
               </Button>
-              <Button type="submit">Registrar Abono</Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 shadow-sm">Registrar Abono</Button>
             </div>
           </form>
         </Form>

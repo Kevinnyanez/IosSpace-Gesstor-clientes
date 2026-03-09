@@ -170,13 +170,23 @@ export function ChatPage() {
     const content = draft.trim();
     setDraft('');
 
-    await supabase
+    const { data: inserted } = await supabase
       .from('chat_messages')
       .insert({
         conversation_id: conversationId,
         sender_id: user.id,
         content,
+      })
+      .select()
+      .single();
+
+    if (inserted) {
+      setMessages(prev => {
+        if (prev.some(m => m.id === inserted.id)) return prev;
+        return [...prev, inserted];
       });
+      setTimeout(scrollToBottom, 50);
+    }
 
     await supabase
       .from('chat_conversations')

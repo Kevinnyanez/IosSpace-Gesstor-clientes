@@ -183,55 +183,47 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="text-orange-600 hover:text-orange-700 border-orange-300">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          Aplicar Recargos ({deudasVencidas.length})
+        <Button variant="outline" size="sm" className="text-amber-600 hover:text-amber-700 border-amber-200 hover:bg-amber-50 h-9">
+          <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+          Recargos ({deudasVencidas.length})
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-600" />
-            Aplicar Recargos a Deudas Vencidas
-          </DialogTitle>
-          <DialogDescription>
-            Se encontraron {deudasVencidas.length} deudas vencidas. Recargo: 0,5% por día + 10% cada 30 días desde el vencimiento.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-base">Aplicar Recargos</DialogTitle>
+              <p className="text-xs text-gray-400 mt-0.5">{deudasVencidas.length} deudas vencidas · 0,5% diario + 10% cada 30 días</p>
+            </div>
+          </div>
         </DialogHeader>
         
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50/80 border border-amber-100">
             <div>
-              <h3 className="font-semibold text-orange-900">Recargos Automáticos</h3>
-              <p className="text-sm text-orange-700">
-                Aplica recargos según la configuración del sistema a todas las deudas vencidas
-              </p>
+              <p className="text-sm font-medium text-gray-900">Recargos automáticos</p>
+              <p className="text-xs text-gray-500 mt-0.5">Aplica a todas las deudas vencidas de una vez</p>
             </div>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="default" 
-                  className="bg-orange-600 text-white hover:bg-orange-700"
-                  disabled={loading}
-                >
-                  <Calculator className="h-4 w-4 mr-2" />
-                  {loading ? 'Aplicando...' : 'Aplicar Automático'}
+                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 shadow-sm h-8" disabled={loading}>
+                  <Calculator className="h-3.5 w-3.5 mr-1.5" />
+                  {loading ? 'Aplicando...' : 'Aplicar todas'}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>¿Aplicar recargos automáticos?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta acción aplicará recargos automáticamente a {deudasVencidas.length} deudas vencidas 
-                    según la configuración del sistema. Los montos totales se actualizarán. Esta acción no se puede deshacer.
+                    Se aplicarán recargos a {deudasVencidas.length} deudas vencidas. Los montos se actualizarán. No se puede deshacer.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={aplicarRecargosAutomaticos}
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
+                  <AlertDialogAction onClick={aplicarRecargosAutomaticos} className="bg-amber-600 hover:bg-amber-700">
                     Aplicar Recargos
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -239,77 +231,80 @@ export function AplicarRecargosForm({ deudas, onRecargosAplicados }: AplicarReca
             </AlertDialog>
           </div>
 
-          <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900">Deudas vencidas (recargo 0,5% por día + 10% cada 30 días)</h3>
-            <div className="max-h-96 overflow-y-auto space-y-2">
-              {deudasVencidas.map((deuda) => {
-                const fechaVencimiento = new Date(deuda.fecha_vencimiento);
-                fechaVencimiento.setHours(0, 0, 0, 0);
-                const hasta = new Date();
-                hasta.setHours(23, 59, 59, 999);
-                let fechaDesde: Date;
-                if (deuda.fecha_ultimo_recargo) {
-                  fechaDesde = new Date(deuda.fecha_ultimo_recargo);
-                  fechaDesde.setHours(0, 0, 0, 0);
-                  fechaDesde.setDate(fechaDesde.getDate() + 1);
-                } else {
-                  fechaDesde = new Date(fechaVencimiento);
-                }
-                const baseParaRecargo = deuda.monto_restante ?? deuda.monto_total;
-                const montoRecargo = calcularRecargoPorDiasYMeses(baseParaRecargo, fechaDesde, hasta);
-                const diasVencido = Math.max(0, Math.ceil((hasta.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24)));
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Detalle por deuda</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/80">
+                    <th className="text-left font-medium text-gray-500 text-[10px] uppercase tracking-wider px-3 py-2">Cliente / Concepto</th>
+                    <th className="text-center font-medium text-gray-500 text-[10px] uppercase tracking-wider px-3 py-2">Días</th>
+                    <th className="text-right font-medium text-gray-500 text-[10px] uppercase tracking-wider px-3 py-2">Deuda</th>
+                    <th className="text-right font-medium text-gray-500 text-[10px] uppercase tracking-wider px-3 py-2">Recargo</th>
+                    <th className="text-right font-medium text-gray-500 text-[10px] uppercase tracking-wider px-3 py-2 w-20"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {deudasVencidas.map((deuda) => {
+                    const fechaVencimiento = new Date(deuda.fecha_vencimiento);
+                    fechaVencimiento.setHours(0, 0, 0, 0);
+                    const hasta = new Date();
+                    hasta.setHours(23, 59, 59, 999);
+                    let fechaDesde: Date;
+                    if (deuda.fecha_ultimo_recargo) {
+                      fechaDesde = new Date(deuda.fecha_ultimo_recargo);
+                      fechaDesde.setHours(0, 0, 0, 0);
+                      fechaDesde.setDate(fechaDesde.getDate() + 1);
+                    } else {
+                      fechaDesde = new Date(fechaVencimiento);
+                    }
+                    const baseParaRecargo = deuda.monto_restante ?? deuda.monto_total;
+                    const montoRecargo = calcularRecargoPorDiasYMeses(baseParaRecargo, fechaDesde, hasta);
+                    const diasVencido = Math.max(0, Math.ceil((hasta.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24)));
+                    const simb = MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$';
 
-                return (
-                  <div key={deuda.id} className="flex items-center justify-between p-3 border rounded-lg bg-white">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">
-                          {deuda.cliente.nombre} {deuda.cliente.apellido}
-                        </h4>
-                        <Badge variant={diasVencido === 0 ? "default" : "destructive"} className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {diasVencido === 0 ? 'Vence hoy' : `${diasVencido} días vencido`}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600">{deuda.concepto}</p>
-                      <div className="flex items-center gap-4 text-sm mt-1">
-                        <span>Deuda: {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{deuda.monto_restante.toLocaleString()}</span>
-                        <span className="text-orange-600 font-semibold">
-                          Recargo: {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoRecargo.toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Vencía: {fechaVencimiento.toLocaleDateString('es-AR')}
-                      </p>
-                    </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="text-orange-600 hover:text-orange-700 border-orange-300">
-                          Aplicar Recargo
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>¿Aplicar recargo individual?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Se aplicará un recargo de {MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoRecargo.toLocaleString()} 
-                            a la deuda de {deuda.cliente.nombre} {deuda.cliente.apellido}. El monto total se actualizará. Esta acción no se puede deshacer.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => aplicarRecargoManual(deuda.id, montoRecargo, deuda)}
-                            className="bg-orange-600 hover:bg-orange-700"
-                          >
-                            Aplicar Recargo
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                );
-              })}
+                    return (
+                      <tr key={deuda.id} className="hover:bg-gray-50/50 group">
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium text-gray-900">{deuda.cliente.nombre} {deuda.cliente.apellido}</p>
+                          <p className="text-gray-500 mt-0.5">{deuda.concepto}</p>
+                          <p className="text-gray-400 mt-0.5">Vencía: {fechaVencimiento.toLocaleDateString('es-AR')}</p>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <Badge variant="secondary" className="text-[9px] bg-red-100 text-red-700">
+                            {diasVencido}d
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-gray-700 font-medium">{simb}{deuda.monto_restante.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right text-amber-600 font-semibold">{simb}{montoRecargo.toLocaleString()}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-gray-400 hover:text-amber-600 opacity-60 group-hover:opacity-100 transition-opacity">
+                                Aplicar
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Aplicar recargo individual?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Se aplicará un recargo de {simb}{montoRecargo.toLocaleString()} a la deuda de {deuda.cliente.nombre} {deuda.cliente.apellido}. No se puede deshacer.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => aplicarRecargoManual(deuda.id, montoRecargo, deuda)} className="bg-amber-600 hover:bg-amber-700">
+                                  Aplicar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

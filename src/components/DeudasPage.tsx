@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X, Printer, ChevronDown } from "lucide-react";
+import { Search, DollarSign, AlertTriangle, Calendar, Eye, Trash2, X, Printer, ChevronDown, CreditCard, TrendingUp, Loader2 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   AlertDialog,
@@ -645,20 +645,23 @@ export function DeudasPage() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="text-lg">Cargando deudas...</div>
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
           <SidebarTrigger />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gestión de Deudas</h1>
-            <p className="text-gray-600 mt-2">Controla los pagos y saldos pendientes</p>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <CreditCard className="h-6 w-6 text-blue-600" />
+              Gestión de Deudas
+            </h1>
+            <p className="text-sm text-gray-500">Controla los pagos y saldos pendientes</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -674,105 +677,57 @@ export function DeudasPage() {
         </TabsList>
 
         <TabsContent value="deudas" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Adeudado (ARS)</CardTitle>
-                <DollarSign className="h-5 w-5 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  ${stats.totalAdeudadoARS.toLocaleString('es-AR')}
+          <Card className="border shadow-sm">
+            <CardContent className="py-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-x divide-gray-100">
+                <div className="pl-2">
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Adeudado</p>
+                  <p className="text-lg font-bold text-red-600 mt-1">${stats.totalAdeudadoARS.toLocaleString('es-AR')}</p>
+                  <p className="text-sm font-semibold text-red-500">US${stats.totalAdeudadoUSD.toLocaleString('en-US')}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="pl-4">
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Recargos</p>
+                  <p className="text-lg font-bold text-amber-600 mt-1">${stats.recargosAplicadosARS.toLocaleString('es-AR')}</p>
+                  <p className="text-sm font-semibold text-amber-500">US${stats.recargosAplicadosUSD.toLocaleString('en-US')}</p>
+                </div>
+                <div className="pl-4 cursor-pointer" onClick={() => setActiveTab('historial')}>
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Cobrado (mes)</p>
+                  <p className="text-lg font-bold text-emerald-600 mt-1">${stats.cobradoMesARS.toLocaleString('es-AR')}</p>
+                  <p className="text-sm font-semibold text-emerald-500">US${stats.cobradoMesUSD.toLocaleString('en-US')}</p>
+                </div>
+                <div className="pl-4">
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Activas</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{stats.deudasActivas}</p>
+                  <p className="text-xs text-gray-400">{stats.deudasConRecargo} con recargo</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Adeudado (USD)</CardTitle>
-                <DollarSign className="h-5 w-5 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  US${stats.totalAdeudadoUSD.toLocaleString('en-US')}
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                    <CreditCard className="h-5 w-5 text-gray-700" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">
+                      Registro de deudas
+                      <span className="text-xs font-normal text-gray-400 ml-2">
+                        {clientesOrdenados.length} {clientesOrdenados.length === 1 ? 'cliente' : 'clientes'}
+                        {searchTerm ? ` · ${clientesPaginados.length} mostrados` : ''}
+                      </span>
+                    </CardTitle>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Recargos (ARS)</CardTitle>
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  ${stats.recargosAplicadosARS.toLocaleString('es-AR')}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Recargos (USD)</CardTitle>
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  US${stats.recargosAplicadosUSD.toLocaleString('en-US')}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card 
-              className="cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => setActiveTab('historial')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Cobrado Este Mes</CardTitle>
-                <DollarSign className="h-5 w-5 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold text-green-600">
-                  ${stats.cobradoMesARS.toLocaleString('es-AR')} ARS
-                </div>
-                <div className="text-lg font-bold text-green-600">
-                  US${stats.cobradoMesUSD.toLocaleString('en-US')}
-                </div>
-                <p className="text-xs text-gray-600 mt-1">Click para ver historial</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Deudas Activas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stats.deudasActivas}
-                </div>
-                <p className="text-xs text-gray-600 mt-1">{stats.deudasConRecargo} con recargo</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>
-                  Registro de Deudas ({clientesOrdenados.length} {clientesOrdenados.length === 1 ? 'cliente' : 'clientes'})
-                  {searchTerm && (
-                    <span className="text-sm font-normal text-gray-500 ml-2">
-                      - {clientesPaginados.length} mostrados
-                    </span>
-                  )}
-                </CardTitle>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     placeholder="Buscar por cliente o concepto..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-64 h-9"
                   />
                 </div>
               </div>
@@ -821,234 +776,195 @@ export function DeudasPage() {
     const deudasPendientesCliente = deudas.filter(d => d.estado !== 'pagado');
     const totalDeudas = deudas.length;
     const deudasPagadas = deudas.filter(d => d.estado === 'pagado').length;
+    const tieneVencidas = deudas.some(d => d.estado === 'vencido');
 
-    // 👉 Cliente al día solo si TODAS las monedas están saldadas
     const clienteAlDia = totalesPorMoneda.every(t => t.restante <= 0);
 
+    const borderColor = clienteAlDia ? 'border-l-emerald-500' : tieneVencidas ? 'border-l-red-500' : 'border-l-blue-500';
+    const avatarColor = clienteAlDia ? 'bg-emerald-100 text-emerald-700' : tieneVencidas ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700';
+    const badgeColor = clienteAlDia ? 'bg-emerald-100 text-emerald-700' : tieneVencidas ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+    const badgeText = clienteAlDia ? 'Al día' : tieneVencidas ? 'Vencido' : 'Pendiente';
+
     return (
-      <Card key={clienteId} className="border-l-4 border-l-blue-500 shadow-sm">
-        <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 flex-1">
-              <div>
-                <h3 className="font-bold text-lg text-gray-900">
-                  {cliente.nombre} {cliente.apellido}
-                </h3>
-                {cliente.telefono && (
-                  <p className="text-xs text-gray-600 mt-0.5">📞 {cliente.telefono}</p>
-                )}
+      <div key={clienteId} className={`rounded-lg border bg-white border-gray-200 border-l-4 ${borderColor} hover:shadow-md transition-shadow`}>
+        <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-gray-100">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${avatarColor}`}>
+              {cliente.nombre.charAt(0)}{cliente.apellido.charAt(0)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-gray-900 text-sm">{cliente.nombre} {cliente.apellido}</h3>
+                <Badge variant="secondary" className={`text-[10px] ${badgeColor}`}>
+                  {badgeText}
+                </Badge>
+                <span className="text-[10px] text-gray-400">{deudasPagadas}/{totalDeudas} pagadas</span>
               </div>
-
-              <Badge
-                className={
-                  clienteAlDia
-                    ? 'text-green-700 bg-green-100'
-                    : 'text-orange-700 bg-orange-100'
-                }
-                variant="outline"
-              >
-                {clienteAlDia ? 'Al día' : 'Pendiente'}
-              </Badge>
-
-              <div className="text-xs text-gray-600">
-                {deudasPagadas}/{totalDeudas} pagadas
-              </div>
-
-              {/* 👉 Totales separados por moneda */}
-              <div className="text-sm space-y-1">
+              <div className="flex flex-wrap gap-x-4 mt-0.5">
                 {totalesPorMoneda.map(t => (
-                  <div key={t.moneda}>
-                    <span className="text-gray-700 font-semibold">
-                      Total {t.moneda}: ${t.total.toLocaleString()}
-                    </span>
-                    <span
-                      className={
-                        t.restante > 0
-                          ? 'text-red-600 font-semibold ml-3'
-                          : 'text-green-600 ml-3'
-                      }
-                    >
-                      Resta: ${t.restante.toLocaleString()}
-                    </span>
-                  </div>
+                  <span key={t.moneda} className="text-xs text-gray-500">
+                    {t.moneda}: <strong className="text-gray-800">${t.total.toLocaleString()}</strong>
+                    {' · '}Resta: <strong className={t.restante > 0 ? 'text-red-600' : 'text-emerald-600'}>${t.restante.toLocaleString()}</strong>
+                  </span>
                 ))}
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              {deudasPendientesCliente.length > 1 && (
-                <PagoCompletoForm
-                  deudas={deudasPendientesCliente}
-                  onPagoCreated={fetchDeudas}
-                />
-              )}
-
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 h-8">
-                                      <X className="h-3 w-3 mr-1" />
-                                      Eliminar
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>¿Eliminar todas las deudas de {cliente.nombre} {cliente.apellido}?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Esta acción eliminará permanentemente todas las {totalDeudas} deudas y todos sus pagos asociados. Esta acción no se puede deshacer.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction 
-                                        onClick={() => handleDeleteGrupoDeudas(deudas)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Eliminar Todas
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-3 pb-3">
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {deudasPendientesCliente.length > 1 && (
+              <PagoCompletoForm deudas={deudasPendientesCliente} onPagoCreated={fetchDeudas} />
+            )}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-600 h-8">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar todas las deudas de {cliente.nombre} {cliente.apellido}?</AlertDialogTitle>
+                  <AlertDialogDescription>Se eliminarán permanentemente las {totalDeudas} deudas y sus pagos. No se puede deshacer.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDeleteGrupoDeudas(deudas)} className="bg-red-600 hover:bg-red-700">Eliminar Todas</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+        <div className="px-4 py-3">
                             <div className="space-y-2">
                               {Object.entries(deudasPorConcepto).map(([conceptoBase, deudasConcepto]) => {
                                 const montoTotalConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_total, 0);
                                 const montoRestanteConcepto = deudasConcepto.reduce((sum, d) => sum + d.monto_restante, 0);
                                 
                                 return (
-                                  <div key={conceptoBase} className="border-l-2 border-l-orange-300 pl-3 py-1">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <h4 className="font-semibold text-sm text-gray-800">{conceptoBase}</h4>
+                                  <div key={conceptoBase} className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="font-medium text-sm text-gray-800">{conceptoBase}</h4>
                                       <div className="flex items-center gap-2">
-                                        <div className="text-xs text-gray-600">
-                                          <span className="font-medium">${montoTotalConcepto.toLocaleString()} {deudasConcepto[0]?.moneda || 'ARS'}</span>
+                                        <span className="text-xs text-gray-500">
+                                          ${montoTotalConcepto.toLocaleString()} {deudasConcepto[0]?.moneda || 'ARS'}
                                           {montoRestanteConcepto > 0 && (
-                                            <span className="text-red-600 ml-1">
-                                              (Resta: ${montoRestanteConcepto.toLocaleString()})
+                                            <span className="text-red-500 ml-1">
+                                              · Resta: ${montoRestanteConcepto.toLocaleString()}
                                             </span>
                                           )}
-                                        </div>
+                                        </span>
                                         <Button
                                           onClick={() => handlePrintDeuda(cliente, conceptoBase, deudasConcepto)}
-                                          variant="outline"
+                                          variant="ghost"
                                           size="sm"
-                                          className="gap-1 h-7 text-xs"
+                                          className="gap-1 h-7 text-xs text-gray-500 hover:text-gray-700"
                                           title="Imprimir esta deuda completa"
                                         >
                                           <Printer className="h-3 w-3" />
-                                          Imprimir
                                         </Button>
                                       </div>
                                     </div>
-                                    <div className="space-y-1">
-                                      {deudasConcepto.map((deuda, index) => {
-                                        const simb = MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo ?? '$';
-                                        const montoOriginal = deuda.monto_total - deuda.recargos;
-                                        const totalCalculado = montoOriginal + deuda.recargos;
-                                        const restaCalculada = deuda.monto_total - deuda.monto_abonado;
-                                        return (
-                                        <div key={deuda.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-xs gap-3">
-                                          <div className="flex flex-col gap-1 flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                              <span className="w-5 h-5 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-semibold shrink-0">
-                                                {index + 1}
-                                              </span>
-                                              <span className="text-gray-500 shrink-0">
-                                                <Calendar className="h-3 w-3 inline mr-0.5" />
-                                                Vence: {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
-                                              </span>
-                                              <Badge 
-                                                className={`${getEstadoBadge(deuda.estado).color} text-xs px-1.5 py-0 shrink-0`}
-                                                variant="outline"
-                                              >
-                                                {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
-                                              </Badge>
-                                            </div>
-                                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
-                                              <span className="text-gray-600" title="Monto original de la deuda (sin recargos)">
-                                                Precio: <strong className="text-gray-900">{simb}{montoOriginal.toLocaleString()}</strong>
-                                              </span>
-                                              {deuda.recargos > 0 && (
-                                                <>
-                                                  <span className="text-gray-400">+</span>
-                                                  <span className="text-orange-600 font-medium" title="Recargo por mora (0,5% por día + 10% cada 30 días)">
-                                                    Recargo: {simb}{deuda.recargos.toLocaleString()}
+                                    <div className="overflow-x-auto -mx-1">
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
+                                            <th className="text-left font-medium py-1.5 px-2 w-8">#</th>
+                                            <th className="text-left font-medium py-1.5 px-2">Vence</th>
+                                            <th className="text-left font-medium py-1.5 px-2">Estado</th>
+                                            <th className="text-right font-medium py-1.5 px-2">Precio</th>
+                                            <th className="text-right font-medium py-1.5 px-2">Recargo</th>
+                                            <th className="text-right font-medium py-1.5 px-2">Total</th>
+                                            <th className="text-right font-medium py-1.5 px-2">Abonado</th>
+                                            <th className="text-right font-medium py-1.5 px-2">Resta</th>
+                                            <th className="w-16"></th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                          {deudasConcepto.map((deuda, index) => {
+                                            const simb = MONEDAS[deuda.moneda as keyof typeof MONEDAS]?.simbolo ?? '$';
+                                            const montoOriginal = deuda.monto_total - deuda.recargos;
+                                            const totalCalculado = montoOriginal + deuda.recargos;
+                                            const restaCalculada = deuda.monto_total - deuda.monto_abonado;
+                                            return (
+                                              <tr key={deuda.id} className="hover:bg-gray-50/50 transition-colors group">
+                                                <td className="py-2 px-2">
+                                                  <span className="w-5 h-5 bg-blue-50 text-blue-600 rounded flex items-center justify-center text-[10px] font-bold">
+                                                    {index + 1}
                                                   </span>
-                                                  <span className="text-gray-400">=</span>
-                                                </>
-                                              )}
-                                              <span className="text-gray-800 font-semibold">
-                                                Total: {simb}{deuda.monto_total.toLocaleString()}
-                                              </span>
-                                              {(deuda.monto_abonado > 0 || deuda.monto_restante !== deuda.monto_total) && (
-                                                <>
-                                                  <span className="text-gray-400">−</span>
-                                                  <span className="text-blue-600">
-                                                    Abonado: {simb}{deuda.monto_abonado.toLocaleString()}
-                                                  </span>
-                                                  <span className="text-gray-400">=</span>
-                                                </>
-                                              )}
-                                              <span className={deuda.monto_restante > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-medium'}>
-                                                Resta: {simb}{(deuda.monto_restante ?? 0).toLocaleString()}
-                                              </span>
-                                            </div>
-                                            {(Math.abs(totalCalculado - deuda.monto_total) > 1 || Math.abs(restaCalculada - (deuda.monto_restante ?? 0)) > 1) && (
-                                              <p className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                                                Verificar: Precio + Recargo debe ser Total; Total − Abonado = Resta
-                                              </p>
-                                            )}
-                                            {deuda.recargos > 0 && (
-                                                <Button
-                                                  variant="link"
-                                                  className="h-auto p-0 text-[11px] text-blue-600 hover:text-blue-800 font-medium"
-                                                  onClick={() => setDetalleRecargoModalDeuda(deuda)}
-                                                >
-                                                  Ver detalles de recargo
-                                                </Button>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            {deuda.estado !== 'pagado' && (
-                                              <AbonoForm deuda={deuda} onAbonoCreated={fetchDeudas} />
-                                            )}
-                                            <AlertDialog>
-                                              <AlertDialogTrigger asChild>
-                                                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 h-6 w-6 p-0">
-                                                  <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                              </AlertDialogTrigger>
-                                              <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                                  <AlertDialogDescription>
-                                                    Esta acción eliminará permanentemente la deuda y todos sus pagos asociados. Esta acción no se puede deshacer.
-                                                  </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                  <AlertDialogAction 
-                                                    onClick={() => handleDeleteDeuda(deuda.id)}
-                                                    className="bg-red-600 hover:bg-red-700"
+                                                </td>
+                                                <td className="py-2 px-2 text-gray-500">
+                                                  {new Date(deuda.fecha_vencimiento).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                                </td>
+                                                <td className="py-2 px-2">
+                                                  <Badge
+                                                    variant="secondary"
+                                                    className={`text-[10px] px-1.5 py-0 ${getEstadoBadge(deuda.estado).color}`}
                                                   >
-                                                    Eliminar
-                                                  </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                              </AlertDialogContent>
-                                            </AlertDialog>
-                                          </div>
-                                        </div>
-                                        );
-                                      })}
+                                                    {deuda.estado.charAt(0).toUpperCase() + deuda.estado.slice(1)}
+                                                  </Badge>
+                                                </td>
+                                                <td className="py-2 px-2 text-right text-gray-700 font-medium">{simb}{montoOriginal.toLocaleString()}</td>
+                                                <td className="py-2 px-2 text-right">
+                                                  {deuda.recargos > 0 ? (
+                                                    <button
+                                                      onClick={() => setDetalleRecargoModalDeuda(deuda)}
+                                                      className="text-amber-600 font-medium hover:text-amber-800 hover:underline transition-colors"
+                                                    >
+                                                      {simb}{deuda.recargos.toLocaleString()}
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-gray-300">—</span>
+                                                  )}
+                                                </td>
+                                                <td className="py-2 px-2 text-right font-semibold text-gray-800">{simb}{deuda.monto_total.toLocaleString()}</td>
+                                                <td className="py-2 px-2 text-right text-blue-600">
+                                                  {deuda.monto_abonado > 0 ? `${simb}${deuda.monto_abonado.toLocaleString()}` : <span className="text-gray-300">—</span>}
+                                                </td>
+                                                <td className={`py-2 px-2 text-right font-bold ${deuda.monto_restante > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                  {simb}{(deuda.monto_restante ?? 0).toLocaleString()}
+                                                </td>
+                                                <td className="py-2 px-2">
+                                                  <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                    {deuda.estado !== 'pagado' && (
+                                                      <AbonoForm deuda={deuda} onAbonoCreated={fetchDeudas} />
+                                                    )}
+                                                    <AlertDialog>
+                                                      <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-600 h-6 w-6 p-0">
+                                                          <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                      </AlertDialogTrigger>
+                                                      <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                                          <AlertDialogDescription>
+                                                            Esta acción eliminará permanentemente la deuda y todos sus pagos asociados. Esta acción no se puede deshacer.
+                                                          </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                          <AlertDialogAction
+                                                            onClick={() => handleDeleteDeuda(deuda.id)}
+                                                            className="bg-red-600 hover:bg-red-700"
+                                                          >
+                                                            Eliminar
+                                                          </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                      </AlertDialogContent>
+                                                    </AlertDialog>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
                                     </div>
                                   </div>
                                 );
                               })}
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -1116,7 +1032,7 @@ export function DeudasPage() {
                     </div>
                   )}
                   
-                  <div className="mt-4 text-center text-sm text-gray-500">
+                  <div className="mt-4 text-center text-xs text-gray-400">
                     Mostrando {startIndex + 1} - {Math.min(endIndex, clientesOrdenados.length)} de {clientesOrdenados.length} clientes
                   </div>
                 </>

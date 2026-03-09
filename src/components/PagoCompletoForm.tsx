@@ -144,34 +144,49 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700">
-          <CreditCard className="h-4 w-4 mr-1" />
+        <Button variant="outline" size="sm" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 h-8">
+          <CreditCard className="h-3.5 w-3.5 mr-1" />
           Pagar Todo
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>Pago Completo</DialogTitle>
-          <div className="text-sm text-gray-600">
-            <p><strong>Cliente:</strong> {cliente?.nombre} {cliente?.apellido}</p>
-            <p><strong>Concepto:</strong> {conceptoBase}</p>
-            <p><strong>Cuotas a pagar:</strong> {deudas.filter(d => d.estado !== 'pagado').length}</p>
-            <p><strong>Total a pagar:</strong> {MONEDAS[moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoTotalRestante.toLocaleString()} {moneda}</p>
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+              <CreditCard className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-base">Pago Completo</DialogTitle>
+              <p className="text-xs text-gray-400 mt-0.5">{cliente?.nombre} {cliente?.apellido} — {conceptoBase}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div>
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide block">Cuotas</span>
+                <span className="text-sm font-semibold text-gray-900">{deudas.filter(d => d.estado !== 'pagado').length}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-gray-400 uppercase tracking-wide block">Total a pagar</span>
+              <span className="text-sm font-semibold text-gray-900">{MONEDAS[moneda as keyof typeof MONEDAS]?.simbolo || '$'}{montoTotalRestante.toLocaleString()} {moneda}</span>
+            </div>
           </div>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
             <FormField
               control={form.control}
               name="monto"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto Total a Pagar ({moneda}) *</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Monto ({moneda}) *</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
                       step="0.01"
                       placeholder="0.00"
+                      className="h-9"
                       {...field}
                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                     />
@@ -186,14 +201,14 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
               name="fecha_pago"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Fecha de Pago *</FormLabel>
+                  <FormLabel className="text-xs font-medium text-gray-600">Fecha de Pago *</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
                           variant={"outline"}
                           className={cn(
-                            "w-full pl-3 text-left font-normal",
+                            "w-full pl-3 text-left font-normal h-9",
                             !field.value && "text-muted-foreground"
                           )}
                         >
@@ -221,11 +236,11 @@ export function PagoCompletoForm({ deudas, onPagoCreated }: PagoCompletoFormProp
               )}
             />
             
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="text-gray-500">
                 Cancelar
               </Button>
-              <Button type="submit">Pagar Todo</Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 shadow-sm">Pagar Todo</Button>
             </div>
           </form>
         </Form>

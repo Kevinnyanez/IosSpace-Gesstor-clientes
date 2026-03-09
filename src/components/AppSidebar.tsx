@@ -11,7 +11,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, Users, Package, CreditCard, Calendar, HelpCircle, Settings, LogOut, MessageCircle } from "lucide-react";
+import { Home, Users, Package, CreditCard, Calendar, Settings, LogOut, MessageCircle, Bell } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/hooks/useChatUnread";
@@ -24,7 +24,7 @@ const menuItems = [
   { title: "Calendario", url: "/calendario", icon: Calendar },
   { title: "Inventario", url: "/inventario", icon: Package },
   { title: "Mensajes", url: "/chat", icon: MessageCircle },
-  { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
+  { title: "Notificaciones", url: "/notificaciones", icon: Bell },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
 
@@ -42,19 +42,14 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-gray-200">
       <SidebarHeader className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-blue-900">IoSSpace Control</h2>
-          </div>
-          <div className="flex-shrink-0">
-            <img 
-              src="/lovable-uploads/139ccb2f-7ba1-4720-9a2e-04dbfc1f46a3.png" 
-              alt="Appy Studios" 
-              className="w-12 h-12 object-contain opacity-70"
-            />
-          </div>
+        <div className="flex items-center gap-3">
+          <img
+            src="/iosspace27-logo.svg"
+            alt="IOSSpace27"
+            className="h-8 object-contain"
+          />
         </div>
-        <p className="text-xs text-gray-500 mt-1">Powered by Appy Studios</p>
+        <p className="text-[10px] text-gray-400 mt-1">Powered by <span className="font-medium">Appy Studios</span></p>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
