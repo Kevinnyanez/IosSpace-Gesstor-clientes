@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   Sidebar,
@@ -10,9 +9,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, Users, Package, CreditCard, Calendar, HelpCircle, Settings } from "lucide-react";
+import { Home, Users, Package, CreditCard, Calendar, HelpCircle, Settings, LogOut } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -27,6 +29,12 @@ const menuItems = [
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, profile, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <Sidebar className="border-r border-gray-200">
@@ -72,6 +80,23 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t border-gray-200 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-gray-900 truncate">{user?.email}</p>
+            <p className="text-[10px] text-gray-500 capitalize">{profile?.role ?? 'usuario'}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            className="shrink-0 text-gray-500 hover:text-red-600 h-8 w-8 p-0"
+            title="Cerrar sesión"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
