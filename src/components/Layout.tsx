@@ -2,6 +2,7 @@
 import React from 'react';
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ChatBubble } from "@/components/ChatBubble";
 import { Toaster } from "@/components/ui/toaster";
 
 interface LayoutProps {
@@ -16,6 +17,7 @@ export function Layout({ children }: LayoutProps) {
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+        <ChatBubble />
         <Toaster />
       </div>
     </SidebarProvider>

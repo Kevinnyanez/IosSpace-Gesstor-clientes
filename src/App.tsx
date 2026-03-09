@@ -12,6 +12,7 @@ import { CalendarioPage } from "./components/CalendarioPage";
 import { InventarioPage } from "./components/InventarioPage";
 import { AyudaPage } from "./components/AyudaPage";
 import { ConfiguracionPage } from "./components/ConfiguracionPage";
+import { ChatPage } from "./components/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ function AppContent() {
         <Route path="/inventario" element={<InventarioPage />} />
         <Route path="/ayuda" element={<AyudaPage />} />
         <Route path="/configuracion" element={<ConfiguracionPage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

@@ -30,6 +30,57 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_conversations: {
+        Row: {
+          id: number
+          user_1: string
+          user_2: string
+          last_message_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          user_1: string
+          user_2: string
+          last_message_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          user_1?: string
+          user_2?: string
+          last_message_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          id: number
+          conversation_id: number
+          sender_id: string
+          content: string
+          created_at: string
+          read_at: string | null
+        }
+        Insert: {
+          id?: number
+          conversation_id: number
+          sender_id: string
+          content: string
+          created_at?: string
+          read_at?: string | null
+        }
+        Update: {
+          id?: number
+          conversation_id?: number
+          sender_id?: string
+          content?: string
+          created_at?: string
+          read_at?: string | null
+        }
+        Relationships: []
+      }
       categorias: {
         Row: {
           activa: boolean

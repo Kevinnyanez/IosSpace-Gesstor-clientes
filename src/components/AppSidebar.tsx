@@ -11,9 +11,10 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, Users, Package, CreditCard, Calendar, HelpCircle, Settings, LogOut } from "lucide-react";
+import { Home, Users, Package, CreditCard, Calendar, HelpCircle, Settings, LogOut, MessageCircle } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatUnread } from "@/hooks/useChatUnread";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
@@ -22,6 +23,7 @@ const menuItems = [
   { title: "Deudas", url: "/deudas", icon: CreditCard },
   { title: "Calendario", url: "/calendario", icon: Calendar },
   { title: "Inventario", url: "/inventario", icon: Package },
+  { title: "Mensajes", url: "/chat", icon: MessageCircle },
   { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
@@ -30,6 +32,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
+  const { unread } = useChatUnread();
 
   const handleSignOut = async () => {
     await signOut();
@@ -71,7 +74,12 @@ export function AppSidebar() {
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-900 transition-colors"
                     >
                       <item.icon className="w-5 h-5" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {item.url === '/chat' && unread > 0 && (
+                        <span className="ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold bg-red-500 text-white rounded-full">
+                          {unread > 99 ? '99+' : unread}
+                        </span>
+                      )}
                     </button>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
